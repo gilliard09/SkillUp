@@ -103,7 +103,7 @@ export default function CourseDetailsPage() {
                   title={module.title}
                   description={module.description}
                   progress={progressPercent}
-                  status={status}
+                  status={status as any}
                   lessonCount={totalLessons}
                 />
               </Link>

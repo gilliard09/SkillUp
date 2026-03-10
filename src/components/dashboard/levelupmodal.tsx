@@ -19,8 +19,10 @@ interface LevelUpModalProps {
 }
 
 export function LevelUpModal({ isOpen, onClose, levelData }: LevelUpModalProps) {
-  // Extraímos as cores para facilitar o uso no Tailwind
-  const { name, color, bg, border } = levelData;
+  // Adicione essa verificação logo no início do componente
+if (!levelData) return null; 
+
+const { name, color, bg, border } = levelData;
 
   return (
     <AnimatePresence>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
@@ -8,7 +8,8 @@ import { Zap, User, Mail, Lock, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-export default function VipRegisterPage() {
+// 1. Criamos um componente interno para isolar a lógica que usa useSearchParams
+function VipRegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const courseId = searchParams.get('courseId'); // Pega o ID da URL
@@ -29,7 +30,6 @@ export default function VipRegisterPage() {
     setError('');
 
     try {
-      // 1. Criar o usuário no Auth do Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -43,15 +43,12 @@ export default function VipRegisterPage() {
 
       const userId = authData.user.id;
 
-      // 2. Criar o perfil do aluno
       await supabase.from('profiles').upsert({
         id: userId,
         full_name: formData.fullName,
         xp: 0
       });
 
-      // 3. MATRÍCULA AUTOMÁTICA (O Pulo do Gato)
-      // Se houver um courseId na URL, ele já ganha o acesso
       if (courseId) {
         await supabase.from('enrollments').insert({
           user_id: userId,
@@ -85,7 +82,6 @@ export default function VipRegisterPage() {
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Decorativo */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-brand-primary/10 via-transparent to-transparent -z-10" />
 
       <div className="w-full max-w-md">
@@ -156,5 +152,18 @@ export default function VipRegisterPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+// 2. Exportação principal envolvida no Suspense
+export default function VipRegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <Loader2 className="animate-spin text-brand-primary" size={40} />
+      </div>
+    }>
+      <VipRegisterForm />
+    </Suspense>
   );
 }
