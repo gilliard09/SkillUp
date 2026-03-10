@@ -1,26 +1,77 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* Cores de Marca Customizadas */
+  --color-brand-primary: oklch(0.58 0.23 268.42); /* #7C3AED - Roxo */
+  --color-brand-secondary: oklch(0.67 0.19 232.66); /* #3B82F6 - Azul */
+  
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root {
+  --radius: 0.75rem;
+  
+  /* Forçando Dark Mode como padrão nas variáveis de raiz */
+  --background: oklch(0.14 0.03 262.15); /* #0F172A */
+  --foreground: oklch(0.92 0.01 255);
+  --card: oklch(0.18 0.03 262.15 / 80%);
+  --card-foreground: oklch(0.92 0.01 255);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 5%);
+  --primary: oklch(0.58 0.23 268.42);
+  --secondary: oklch(0.67 0.19 232.66);
+  --ring: oklch(0.58 0.23 268.42);
+}
+
+/* Seletor específico para garantir que a classe .dark aplique as cores */
+.dark {
+  --background: oklch(0.14 0.03 262.15);
+  --foreground: oklch(0.92 0.01 255);
+  --card: oklch(0.18 0.03 262.15 / 80%);
+  --card-foreground: oklch(0.92 0.01 255);
+  --border: oklch(1 0 0 / 10%);
+  --primary: oklch(0.58 0.23 268.42);
+  --secondary: oklch(0.67 0.19 232.66);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    /* O !important garante que o fundo branco padrão do navegador não vença */
+    background-color: var(--background) !important;
+    color: var(--foreground) !important;
+    @apply transition-colors duration-300;
+    
+    /* Gradientes decorativos para o visual Premium */
+    background-image: 
+      radial-gradient(at 0% 0%, oklch(0.58 0.23 268.42 / 0.07) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, oklch(0.67 0.19 232.66 / 0.07) 0px, transparent 50%);
+    min-height: 100vh;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .glass-effect {
+    @apply bg-card/50 backdrop-blur-xl border border-white/10;
+  }
 }
