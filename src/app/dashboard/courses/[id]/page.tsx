@@ -1,76 +1,157 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { ModuleCard } from '@/components/dashboard/module-card';
 import { ChevronLeft, BookOpen, Loader2, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
+// ============================================================
+// TIPOS
+// ============================================================
+type LessonRef = {
+  id: string;
+};
+
+type Module = {
+  id: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  lessons: LessonRef[];
+};
+
+type Course = {
+  id: string;
+  title: string;
+  category: string;
+  description: string | null;
+  image_url: string | null;
+};
+
+type ModuleStatus = 'concluido' | 'em_progresso' | 'nao_iniciado';
+
+// ============================================================
+// COMPONENTE
+// ============================================================
 export default function CourseDetailsPage() {
   const { id } = useParams();
-  const [course, setCourse] = useState<any>(null);
-  const [modules, setModules] = useState<any[]>([]);
+  const router = useRouter();
+
+  const [course, setCourse] = useState<Course | null>(null);
+  const [modules, setModules] = useState<Module[]>([]);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Garante que id é sempre string
+  const courseId = Array.isArray(id) ? id[0] : id;
+
   useEffect(() => {
+    if (!courseId) return;
+
     async function fetchCourseData() {
       try {
         setLoading(true);
+
+        // Verifica autenticação
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // 1. Detalhes do curso
-        const { data: courseData } = await supabase.from('courses').select('*').eq('id', id).single();
-        setCourse(courseData);
-
-        // 2. Módulos e as IDs das lições dentro deles
-        const { data: modulesData } = await supabase
-          .from('modules')
-          .select('*, lessons(id)')
-          .eq('course_id', id)
-          .order('order_index', { ascending: true });
-
-        // 3. Progresso do usuário (quais aulas ele já terminou)
-        const { data: progressData } = await supabase
-          .from('lesson_progress')
-          .select('lesson_id')
-          .eq('user_id', user.id)
-          .eq('is_completed', true);
-
-        if (progressData) {
-          setCompletedLessons(progressData.map(p => p.lesson_id));
+        if (!user) {
+          router.push('/login');
+          return;
         }
-        
-        setModules(modulesData || []);
+
+        // Paraleliza: curso + módulos + progresso + matrícula
+        const [courseRes, modulesRes, progressRes, enrollmentRes] = await Promise.all([
+          supabase
+            .from('courses')
+            .select('*')
+            .eq('id', courseId)
+            .single(),
+
+          supabase
+            .from('modules')
+            .select('*, lessons(id)')
+            .eq('course_id', courseId)
+            .order('order_index', { ascending: true }),
+
+          supabase
+            .from('lesson_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .eq('is_completed', true),
+
+          supabase
+            .from('enrollments')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('product_id', courseId)
+            .single(),
+        ]);
+
+        // Curso não encontrado → volta pro dashboard
+        if (courseRes.error || !courseRes.data) {
+          router.push('/dashboard');
+          return;
+        }
+
+        // Sem matrícula → volta pro dashboard
+        if (enrollmentRes.error || !enrollmentRes.data) {
+          router.push('/dashboard');
+          return;
+        }
+
+        setCourse(courseRes.data);
+        setModules(modulesRes.data || []);
+
+        if (progressRes.data) {
+          setCompletedLessons(progressRes.data.map(p => p.lesson_id));
+        }
       } catch (err) {
-        console.error("Erro ao carregar detalhes do curso:", err);
+        console.error('Erro ao carregar detalhes do curso:', err);
+        router.push('/dashboard');
       } finally {
         setLoading(false);
       }
     }
+
     fetchCourseData();
-  }, [id]);
+  }, [courseId, router]);
 
-  if (loading) return (
-    <div className="h-screen flex items-center justify-center bg-slate-0 text-brand-primary">
-      <Loader2 className="animate-spin" size={40} />
-    </div>
-  );
+  // ----------------------------------------------------------
+  // LOADING
+  // ----------------------------------------------------------
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-slate-950 text-brand-primary">
+        <Loader2 className="animate-spin" size={40} />
+      </div>
+    );
+  }
 
+  // ----------------------------------------------------------
+  // RENDER
+  // ----------------------------------------------------------
   return (
-    <div className="min-h-screen pb-20 bg-slate-0 px-4 md:px-8">
+    <div className="min-h-screen pb-20 bg-slate-950 px-4 md:px-8">
       <div className="max-w-7xl mx-auto pt-8">
-        <Link href="/dashboard" className="inline-flex items-center gap-2 text-slate-500 hover:text-white mb-10 transition-colors group">
+
+        {/* Voltar */}
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center gap-2 text-slate-500 hover:text-white mb-10 transition-colors group"
+        >
           <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
           <span className="font-black text-xs uppercase tracking-widest italic">Voltar aos Meus Cursos</span>
         </Link>
 
+        {/* Header do Curso */}
         <header className="mb-12 space-y-4">
           <div className="flex items-center gap-3">
-             <div className="h-1 w-12 bg-brand-primary rounded-full" />
-             <span className="text-brand-primary font-black uppercase text-[10px] tracking-[0.3em] italic">Formação completa</span>
+            <div className="h-1 w-12 bg-brand-primary rounded-full" />
+            <span className="text-brand-primary font-black uppercase text-[10px] tracking-[0.3em] italic">
+              Formação completa
+            </span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black text-white uppercase italic tracking-tighter leading-none">
             {course?.title}
@@ -85,37 +166,41 @@ export default function CourseDetailsPage() {
           </div>
         </header>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {modules.map((module) => {
-            // LÓGICA DE PROGRESSO POR MÓDULO
-            const moduleLessons = module.lessons || [];
-            const totalLessons = moduleLessons.length;
-            const doneInModule = moduleLessons.filter((l: any) => completedLessons.includes(l.id)).length;
-            
-            const progressPercent = totalLessons > 0 ? Math.round((doneInModule / totalLessons) * 100) : 0;
-            
-            // Define o status visual
-            const status = progressPercent === 100 ? "concluido" : progressPercent > 0 ? "em_progresso" : "nao_iniciado";
+        {/* Grid de Módulos */}
+        {modules.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {modules.map((module) => {
+              const moduleLessons = module.lessons || [];
+              const totalLessons = moduleLessons.length;
+              const doneInModule = moduleLessons.filter(l => completedLessons.includes(l.id)).length;
+              const progressPercent = totalLessons > 0
+                ? Math.round((doneInModule / totalLessons) * 100)
+                : 0;
 
-            return (
-              <Link href={`/dashboard/modules/${module.id}`} key={module.id} className="group">
-                <ModuleCard 
-                  title={module.title}
-                  description={module.description}
-                  progress={progressPercent}
-                  status={status as any}
-                  lessonCount={totalLessons}
-                />
-              </Link>
-            );
-          })}
-        </div>
+              const status: ModuleStatus =
+                progressPercent === 100 ? 'concluido'
+                : progressPercent > 0   ? 'em_progresso'
+                :                         'nao_iniciado';
 
-        {modules.length === 0 && (
+              return (
+                <Link href={`/dashboard/modules/${module.id}`} key={module.id} className="group">
+                  <ModuleCard
+                    title={module.title}
+                    description={module.description ?? ''}
+                    progress={progressPercent}
+                    status={status}
+                    lessonCount={totalLessons}
+                  />
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
           <div className="py-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
             <p className="text-slate-500 font-black italic uppercase">Nenhum módulo cadastrado ainda.</p>
           </div>
         )}
+
       </div>
     </div>
   );

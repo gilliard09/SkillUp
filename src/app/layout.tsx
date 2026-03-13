@@ -2,7 +2,7 @@
 
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { MobileNav } from "@/components/MobileNav";
+import { MobileNav } from "@/components/mobilenav";
 import { usePathname } from "next/navigation";
 
 const geistSans = Geist({
