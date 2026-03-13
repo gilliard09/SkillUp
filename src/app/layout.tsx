@@ -28,7 +28,7 @@ export default function RootLayout({
   const shouldHideNav = hideNavRoutes.includes(pathname);
 
   return (
-    <html lang="pt-BR" className="dark" suppressHydrationWarning>
+    <html lang="pt-BR" className="dark">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>

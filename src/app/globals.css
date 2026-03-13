@@ -63,11 +63,6 @@
     @apply border-border outline-ring/50;
   }
 
-  html {
-    /* Garante dark mode na raiz — necessário para shadcn/ui */
-    @apply dark;
-  }
-
   body {
     background-color: var(--background);
     color: var(--foreground);
