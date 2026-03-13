@@ -697,6 +697,7 @@ export default function AdminPage() {
                 </select>
                 <input required value={newLesson.title} onChange={e => setNewLesson({ ...newLesson, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Título da Aula" />
                 <input value={newLesson.video_url} onChange={e => setNewLesson({ ...newLesson, video_url: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="URL do Vídeo (YouTube)" />
+                <input value={newLesson.activity_pdf_url} onChange={e => setNewLesson({ ...newLesson, activity_pdf_url: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="URL do PDF (Material Complementar)" />
                 <textarea value={newLesson.content} onChange={e => setNewLesson({ ...newLesson, content: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32" placeholder="Conteúdo / Resumo da aula..." />
                 <Button disabled={loading} className="md:col-span-2 h-14 bg-brand-primary text-white font-bold rounded-2xl uppercase">
                   {loading ? <Loader2 className="animate-spin" size={16} /> : 'Publicar Aula'}
