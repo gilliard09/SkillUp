@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 import { Sidebar } from '@/components/shared/sidebar';
-import { MobileNav } from '@/components/mobilenav';
+import { MobileNav } from '@/components/MobileNav';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
