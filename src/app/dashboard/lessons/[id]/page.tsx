@@ -40,7 +40,7 @@ type Lesson = {
 };
 
 // ============================================================
-// HELPER — URL de embed do YouTube
+// HELPERS
 // ============================================================
 function getEmbedUrl(url: string | null): string | null {
   if (!url) return null;
@@ -51,6 +51,25 @@ function getEmbedUrl(url: string | null): string | null {
     : url;
 }
 
+async function downloadFile(url: string) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Falha ao baixar arquivo.');
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const fileName = url.split('/').pop()?.split('?')[0] ?? 'material.pdf';
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  } catch (err) {
+    console.error('Erro no download:', err);
+  }
+}
+
 // ============================================================
 // COMPONENTE
 // ============================================================
@@ -58,15 +77,15 @@ export default function LessonDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
 
-  // Garante que id é sempre string
   const lessonId = Array.isArray(id) ? id[0] : id;
 
-  const [lesson, setLesson] = useState<Lesson | null>(null);
-  const [hasQuiz, setHasQuiz] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [lesson, setLesson]             = useState<Lesson | null>(null);
+  const [hasQuiz, setHasQuiz]           = useState(false);
+  const [loading, setLoading]           = useState(true);
   const [isCompleting, setIsCompleting] = useState(false);
-  const [isDone, setIsDone] = useState(false);
-  const [toast, setToast] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isDone, setIsDone]             = useState(false);
+  const [downloading, setDownloading]   = useState(false);
+  const [toast, setToast]               = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const notify = (type: 'success' | 'error', text: string) => {
     setToast({ type, text });
@@ -74,7 +93,7 @@ export default function LessonDetailsPage() {
   };
 
   // ----------------------------------------------------------
-  // CARREGAMENTO — paralelo com Promise.all
+  // FETCH
   // ----------------------------------------------------------
   const fetchLessonData = useCallback(async () => {
     if (!lessonId) return;
@@ -88,7 +107,6 @@ export default function LessonDetailsPage() {
         return;
       }
 
-      // Paralela: aula + progresso do usuário + quiz
       const [lessonRes, progressRes, quizRes] = await Promise.all([
         supabase
           .from('lessons')
@@ -110,7 +128,6 @@ export default function LessonDetailsPage() {
           .maybeSingle(),
       ]);
 
-      // Aula não encontrada
       if (lessonRes.error || !lessonRes.data) {
         router.push('/dashboard');
         return;
@@ -118,13 +135,13 @@ export default function LessonDetailsPage() {
 
       const lessonData = lessonRes.data as Lesson;
 
-      // Verifica matrícula no curso pai
+      // maybeSingle — não joga erro se matrícula não existir
       const { data: enrollment } = await supabase
         .from('enrollments')
         .select('id')
         .eq('user_id', user.id)
         .eq('product_id', lessonData.modules?.course_id ?? '')
-        .single();
+        .maybeSingle();
 
       if (!enrollment) {
         router.push('/dashboard');
@@ -134,13 +151,11 @@ export default function LessonDetailsPage() {
       setLesson(lessonData);
       if (progressRes.data) setIsDone(true);
 
-      // Verifica se quiz tem questões
       if (quizRes.data) {
         const { count } = await supabase
           .from('questions')
           .select('*', { count: 'exact', head: true })
           .eq('quiz_id', quizRes.data.id);
-
         setHasQuiz(!!count && count > 0);
       }
     } catch (err) {
@@ -156,10 +171,10 @@ export default function LessonDetailsPage() {
   }, [fetchLessonData]);
 
   // ----------------------------------------------------------
-  // CONCLUIR AULA — com proteção contra XP duplicado
+  // CONCLUIR AULA + XP
   // ----------------------------------------------------------
   const handleCompleteLesson = async () => {
-    if (isDone) return; // Proteção extra contra clique duplo
+    if (isDone || isCompleting) return;
 
     try {
       setIsCompleting(true);
@@ -170,7 +185,7 @@ export default function LessonDetailsPage() {
         return;
       }
 
-      // 1. Verifica se já existe progresso (evita XP duplicado)
+      // 1. Proteção dupla contra XP duplicado
       const { data: existingProgress } = await supabase
         .from('lesson_progress')
         .select('id')
@@ -179,36 +194,32 @@ export default function LessonDetailsPage() {
         .maybeSingle();
 
       if (existingProgress) {
-        // Aula já foi concluída antes — apenas atualiza estado visual
         setIsDone(true);
         return;
       }
 
-      // 2. Registra progresso
+      // 2. Registra progresso com insert direto
       const { error: progressError } = await supabase
         .from('lesson_progress')
-        .upsert(
-          { user_id: user.id, lesson_id: lessonId, is_completed: true },
-          { onConflict: 'user_id,lesson_id' }
-        );
+        .insert({ user_id: user.id, lesson_id: lessonId, is_completed: true });
 
       if (progressError) throw progressError;
 
-      // 3. Soma XP do banco (não hardcoded)
+      // 3. Atualiza XP — busca atual e soma
       const xpReward = lesson?.xp_reward ?? 0;
 
       if (xpReward > 0) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('xp')
           .eq('id', user.id)
           .single();
 
-        const newXp = (profile?.xp ?? 0) + xpReward;
+        if (profileError) throw profileError;
 
         const { error: xpError } = await supabase
           .from('profiles')
-          .update({ xp: newXp })
+          .update({ xp: (profile?.xp ?? 0) + xpReward })
           .eq('id', user.id);
 
         if (xpError) throw xpError;
@@ -216,8 +227,7 @@ export default function LessonDetailsPage() {
 
       // 4. Feedback visual
       setIsDone(true);
-      notify('success', `+${lesson?.xp_reward ?? 0} XP conquistado!`);
-      router.refresh();
+      notify('success', `+${xpReward} XP conquistado!`);
 
     } catch (err: any) {
       console.error('Erro ao concluir aula:', err.message);
@@ -228,11 +238,21 @@ export default function LessonDetailsPage() {
   };
 
   // ----------------------------------------------------------
+  // DOWNLOAD
+  // ----------------------------------------------------------
+  const handleDownload = async () => {
+    if (!lesson?.activity_pdf_url || downloading) return;
+    setDownloading(true);
+    await downloadFile(lesson.activity_pdf_url);
+    setDownloading(false);
+  };
+
+  // ----------------------------------------------------------
   // LOADING / NOT FOUND
   // ----------------------------------------------------------
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="animate-spin text-brand-primary" size={40} />
       </div>
     );
@@ -240,20 +260,20 @@ export default function LessonDetailsPage() {
 
   if (!lesson) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center">
         <p className="text-white font-bold uppercase">Aula não encontrada.</p>
       </div>
     );
   }
 
   const videoEmbedUrl = getEmbedUrl(lesson.video_url);
-  const moduleId = lesson.modules?.id;
+  const moduleId      = lesson.modules?.id;
 
   // ----------------------------------------------------------
   // RENDER
   // ----------------------------------------------------------
   return (
-    <div className="min-h-screen pb-20 bg-slate-950 px-4 md:px-8">
+    <div className="min-h-screen pb-24 px-4 md:px-8">
 
       {/* Toast */}
       {toast && (
@@ -262,16 +282,18 @@ export default function LessonDetailsPage() {
             ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
             : 'bg-red-500/10 border-red-500 text-red-500'
         }`}>
-          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+          {toast.type === 'success'
+            ? <CheckCircle2 size={16} />
+            : <AlertCircle size={16} />
+          }
           {toast.text}
         </div>
       )}
 
       <div className="max-w-7xl mx-auto py-8">
 
-        {/* Header Superior */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-8">
-          {/* Volta para o módulo pai em vez de router.back() */}
           {moduleId ? (
             <Link
               href={`/dashboard/modules/${moduleId}`}
@@ -290,8 +312,8 @@ export default function LessonDetailsPage() {
             </Link>
           )}
 
-          <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
-            <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest italic">
+          <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/10 max-w-[50%]">
+            <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest italic truncate">
               {lesson.modules?.title}
             </span>
           </div>
@@ -299,12 +321,9 @@ export default function LessonDetailsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
 
-          {/* ------------------------------------------------
-              COLUNA PRINCIPAL
-          ------------------------------------------------ */}
+          {/* Coluna Principal */}
           <div className="lg:col-span-8 space-y-8">
 
-            {/* Vídeo ou placeholder */}
             {videoEmbedUrl ? (
               <div className="aspect-video w-full bg-slate-900 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl">
                 <iframe
@@ -324,7 +343,6 @@ export default function LessonDetailsPage() {
               </div>
             )}
 
-            {/* Título e badges */}
             <div className="space-y-4">
               <h1 className="text-3xl md:text-4xl font-black text-white italic uppercase tracking-tighter leading-none">
                 {lesson.title}
@@ -348,7 +366,6 @@ export default function LessonDetailsPage() {
               </div>
             </div>
 
-            {/* Resumo da aula */}
             <div className="bg-slate-900/40 border border-white/5 p-8 rounded-[2.5rem] backdrop-blur-md">
               <h2 className="flex items-center gap-3 mb-6 text-white font-black uppercase tracking-widest text-sm italic">
                 <FileText className="text-brand-primary" size={20} /> Resumo da Aula
@@ -363,12 +380,9 @@ export default function LessonDetailsPage() {
             </div>
           </div>
 
-          {/* ------------------------------------------------
-              SIDEBAR DE AÇÕES
-          ------------------------------------------------ */}
+          {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
 
-            {/* Quiz */}
             {hasQuiz && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -387,7 +401,6 @@ export default function LessonDetailsPage() {
               </motion.div>
             )}
 
-            {/* Controle de Conclusão */}
             <div className="bg-slate-900/60 border border-white/10 p-8 rounded-[2.5rem] backdrop-blur-md">
               <h4 className="text-white font-black uppercase italic tracking-widest text-xs mb-6 flex items-center gap-2">
                 <CheckCircle2
@@ -420,7 +433,6 @@ export default function LessonDetailsPage() {
                 </p>
               )}
 
-              {/* Barra de Progresso */}
               <div className="mt-8 pt-8 border-t border-white/5">
                 <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2">
                   <span className="text-slate-500">Progresso</span>
@@ -438,7 +450,6 @@ export default function LessonDetailsPage() {
               </div>
             </div>
 
-            {/* Material Complementar */}
             {lesson.activity_pdf_url && (
               <div className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem]">
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2 italic">
@@ -448,18 +459,21 @@ export default function LessonDetailsPage() {
                   <a
                     href={lesson.activity_pdf_url}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noreferrer noopener"
                     className="flex items-center justify-center gap-2 bg-white/5 text-white text-[9px] font-black py-4 rounded-xl border border-white/5 hover:bg-white/10 transition-all uppercase italic"
                   >
                     <Eye size={14} /> Ver
                   </a>
-                  <a
-                    href={lesson.activity_pdf_url}
-                    download
-                    className="flex items-center justify-center gap-2 bg-brand-primary text-white text-[9px] font-black py-4 rounded-xl hover:opacity-90 transition-all uppercase italic shadow-lg shadow-brand-primary/20"
+                  <button
+                    onClick={handleDownload}
+                    disabled={downloading}
+                    className="flex items-center justify-center gap-2 bg-brand-primary text-white text-[9px] font-black py-4 rounded-xl hover:opacity-90 transition-all uppercase italic shadow-lg shadow-brand-primary/20 disabled:opacity-60"
                   >
-                    <Download size={14} /> Baixar
-                  </a>
+                    {downloading
+                      ? <Loader2 size={14} className="animate-spin" />
+                      : <><Download size={14} /> Baixar</>
+                    }
+                  </button>
                 </div>
               </div>
             )}
