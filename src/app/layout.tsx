@@ -1,9 +1,6 @@
-'use client';
-
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { MobileNav } from "@/components/MobileNav";
-import { usePathname } from "next/navigation";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,32 +12,39 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// ============================================================
+// METADATA + PWA
+// ============================================================
+export const metadata: Metadata = {
+  title: "SkillUp Academy",
+  description: "Plataforma de ensino da Tecnologge",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "SkillUp",
+  },
+};
+
+// ============================================================
+// LAYOUT RAIZ — server component, sem usePathname
+// MobileNav fica no DashboardLayout, não aqui
+// ============================================================
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const pathname = usePathname();
-
-  // Definimos as rotas onde a barra de navegação NÃO deve aparecer
-  const hideNavRoutes = ["/login", "/register/vip", "/"];
-
-  const shouldHideNav = hideNavRoutes.includes(pathname);
-
   return (
     <html lang="pt-BR" className="dark">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <meta name="theme-color" content="#0F172A" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-50`}
       >
-        <main className="min-h-screen">
-          {children}
-        </main>
-
-        {/* Só renderiza o MobileNav se não estiver nas rotas de autenticação */}
-        {!shouldHideNav && <MobileNav />}
+        {children}
       </body>
     </html>
   );
