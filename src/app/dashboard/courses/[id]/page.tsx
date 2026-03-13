@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { ModuleCard } from '@/components/dashboard/module-card';
+import { ModuleCard, type ModuleStatus } from '@/components/dashboard/ModuleCard';
 import { ChevronLeft, BookOpen, Loader2, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
@@ -30,8 +30,6 @@ type Course = {
   image_url: string | null;
 };
 
-type ModuleStatus = 'concluido' | 'em_progresso' | 'nao_iniciado';
-
 // ============================================================
 // COMPONENTE
 // ============================================================
@@ -39,12 +37,11 @@ export default function CourseDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
 
-  const [course, setCourse] = useState<Course | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
+  const [course, setCourse]                     = useState<Course | null>(null);
+  const [modules, setModules]                   = useState<Module[]>([]);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]                   = useState(true);
 
-  // Garante que id é sempre string
   const courseId = Array.isArray(id) ? id[0] : id;
 
   useEffect(() => {
@@ -54,14 +51,12 @@ export default function CourseDetailsPage() {
       try {
         setLoading(true);
 
-        // Verifica autenticação
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
           router.push('/login');
           return;
         }
 
-        // Paraleliza: curso + módulos + progresso + matrícula
         const [courseRes, modulesRes, progressRes, enrollmentRes] = await Promise.all([
           supabase
             .from('courses')
@@ -86,23 +81,21 @@ export default function CourseDetailsPage() {
             .select('id')
             .eq('user_id', user.id)
             .eq('product_id', courseId)
-            .single(),
+            .maybeSingle(),
         ]);
 
-        // Curso não encontrado → volta pro dashboard
         if (courseRes.error || !courseRes.data) {
           router.push('/dashboard');
           return;
         }
 
-        // Sem matrícula → volta pro dashboard
-        if (enrollmentRes.error || !enrollmentRes.data) {
+        if (!enrollmentRes.data) {
           router.push('/dashboard');
           return;
         }
 
         setCourse(courseRes.data);
-        setModules(modulesRes.data || []);
+        setModules(modulesRes.data ?? []);
 
         if (progressRes.data) {
           setCompletedLessons(progressRes.data.map(p => p.lesson_id));
@@ -123,7 +116,7 @@ export default function CourseDetailsPage() {
   // ----------------------------------------------------------
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-slate-950 text-brand-primary">
+      <div className="h-screen flex items-center justify-center text-brand-primary">
         <Loader2 className="animate-spin" size={40} />
       </div>
     );
@@ -133,7 +126,7 @@ export default function CourseDetailsPage() {
   // RENDER
   // ----------------------------------------------------------
   return (
-    <div className="min-h-screen pb-20 bg-slate-950 px-4 md:px-8">
+    <div className="min-h-screen pb-20 px-4 md:px-8">
       <div className="max-w-7xl mx-auto pt-8">
 
         {/* Voltar */}
@@ -145,7 +138,7 @@ export default function CourseDetailsPage() {
           <span className="font-black text-xs uppercase tracking-widest italic">Voltar aos Meus Cursos</span>
         </Link>
 
-        {/* Header do Curso */}
+        {/* Header */}
         <header className="mb-12 space-y-4">
           <div className="flex items-center gap-3">
             <div className="h-1 w-12 bg-brand-primary rounded-full" />
@@ -170,28 +163,29 @@ export default function CourseDetailsPage() {
         {modules.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {modules.map((module) => {
-              const moduleLessons = module.lessons || [];
-              const totalLessons = moduleLessons.length;
-              const doneInModule = moduleLessons.filter(l => completedLessons.includes(l.id)).length;
+              const moduleLessons   = module.lessons ?? [];
+              const totalLessons    = moduleLessons.length;
+              const doneInModule    = moduleLessons.filter(l => completedLessons.includes(l.id)).length;
               const progressPercent = totalLessons > 0
                 ? Math.round((doneInModule / totalLessons) * 100)
                 : 0;
 
+              // Tipo importado do ModuleCard — sem 'em_progresso'
               const status: ModuleStatus =
-                progressPercent === 100 ? 'concluido'
-                : progressPercent > 0   ? 'em_progresso'
-                :                         'nao_iniciado';
+                progressPercent === 100 ? 'concluido' :
+                progressPercent > 0     ? 'iniciado'  :
+                'nao_iniciado';
 
               return (
-                <Link href={`/dashboard/modules/${module.id}`} key={module.id} className="group">
-                  <ModuleCard
-                    title={module.title}
-                    description={module.description ?? ''}
-                    progress={progressPercent}
-                    status={status}
-                    lessonCount={totalLessons}
-                  />
-                </Link>
+                <ModuleCard
+                  key={module.id}
+                  moduleId={module.id}
+                  title={module.title}
+                  description={module.description ?? ''}
+                  progress={progressPercent}
+                  status={status}
+                  lessonCount={totalLessons}
+                />
               );
             })}
           </div>
