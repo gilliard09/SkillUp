@@ -8,7 +8,8 @@ import {
   PlusCircle, Video, CheckCircle2,
   Trash2, Loader2, Book,
   Briefcase, Users, Trophy, BookOpen,
-  UserPlus, ShieldCheck, AlertCircle, Eye, Copy, Pencil, X
+  UserPlus, ShieldCheck, AlertCircle, Eye, Copy, Pencil, X,
+  Settings, Lock, KeyRound,
 } from 'lucide-react';
 
 // ============================================================
@@ -167,7 +168,8 @@ function DuplicateLessonModal({
 export default function AdminPage() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab]       = useState<'content' | 'students' | 'challenges' | 'approvals'>('content');
+  // MUDANÇA 1: tipo do activeTab inclui 'settings'
+  const [activeTab, setActiveTab]       = useState<'content' | 'students' | 'challenges' | 'approvals' | 'settings'>('content');
   const [loading, setLoading]           = useState(false);
   const [deletingId, setDeletingId]     = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
@@ -192,6 +194,13 @@ export default function AdminPage() {
   const [newLesson,    setNewLesson]    = useState(INITIAL_LESSON);
   const [studentForm,  setStudentForm]  = useState(INITIAL_STUDENT);
   const [newChallenge, setNewChallenge] = useState(INITIAL_CHALLENGE);
+
+  // MUDANÇA 2: estados para a aba de configurações
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword,     setNewPassword]     = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loadingPassword, setLoadingPassword] = useState(false);
+  const [showPasswords,   setShowPasswords]   = useState(false);
 
   // ----------------------------------------------------------
   // NOTIFICAÇÃO
@@ -255,6 +264,53 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authChecking) loadData();
   }, [authChecking, loadData]);
+
+  // MUDANÇA 3: carrega senha atual ao entrar na aba settings
+  const loadCurrentPassword = useCallback(async () => {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'validation_password')
+      .single();
+    if (data) setCurrentPassword(data.value);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'settings') loadCurrentPassword();
+  }, [activeTab, loadCurrentPassword]);
+
+  // MUDANÇA 4: handler para trocar a senha
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (newPassword.length < 4) {
+      notify('error', 'A nova senha deve ter pelo menos 4 caracteres.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      notify('error', 'As senhas não coincidem.');
+      return;
+    }
+
+    setLoadingPassword(true);
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .update({ value: newPassword, updated_at: new Date().toISOString() })
+        .eq('key', 'validation_password');
+
+      if (error) throw error;
+
+      notify('success', 'Senha de validação atualizada!');
+      setCurrentPassword(newPassword);
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      notify('error', 'Erro ao atualizar senha: ' + err.message);
+    } finally {
+      setLoadingPassword(false);
+    }
+  };
 
   // ----------------------------------------------------------
   // DUPLICAR AULA
@@ -337,7 +393,7 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // SALVAR MÓDULO — order_index correto com maybeSingle
+  // SALVAR MÓDULO
   // ----------------------------------------------------------
   const handleSaveModule = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -349,7 +405,7 @@ export default function AdminPage() {
         .eq('course_id', newModule.course_id)
         .order('order_index', { ascending: false })
         .limit(1)
-        .maybeSingle(); // ← maybeSingle: não quebra se não houver módulos
+        .maybeSingle();
 
       const nextOrder = (maxOrder?.order_index ?? 0) + 1;
 
@@ -370,13 +426,12 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // SALVAR AULA — order_index dinâmico por módulo
+  // SALVAR AULA
   // ----------------------------------------------------------
   const handleSaveLesson = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Busca o próximo order_index para o módulo selecionado
       const { data: maxOrder } = await supabase
         .from('lessons')
         .select('order_index')
@@ -393,7 +448,7 @@ export default function AdminPage() {
         video_url:        newLesson.video_url,
         activity_pdf_url: newLesson.activity_pdf_url,
         module_id:        newLesson.module_id,
-        order_index:      nextOrder, // ← dinâmico, nunca fixo em 1
+        order_index:      nextOrder,
       }]);
       if (error) throw error;
       notify('success', 'Aula publicada!');
@@ -429,7 +484,7 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // CRIAR ALUNO — via Edge Function (não desloga o admin)
+  // CRIAR ALUNO — via Edge Function
   // ----------------------------------------------------------
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -473,7 +528,7 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // DELETAR DESAFIO — com modal de confirmação
+  // DELETAR DESAFIO
   // ----------------------------------------------------------
   const handleDeleteChallenge = async () => {
     if (!deleteTarget) return;
@@ -508,7 +563,6 @@ export default function AdminPage() {
   return (
     <div className="space-y-10 pb-8">
 
-      {/* Modal Duplicar */}
       {duplicateTarget && (
         <DuplicateLessonModal
           lesson={duplicateTarget}
@@ -518,7 +572,6 @@ export default function AdminPage() {
         />
       )}
 
-      {/* Modal Deletar Desafio */}
       {deleteTarget && (
         <ConfirmModal
           title="Excluir Desafio"
@@ -529,7 +582,6 @@ export default function AdminPage() {
         />
       )}
 
-      {/* Toast */}
       {message && (
         <div className={`fixed top-5 right-5 z-50 p-4 rounded-2xl border shadow-2xl animate-in slide-in-from-right-4 flex items-center gap-3 font-bold uppercase text-xs ${
           message.type === 'success'
@@ -548,12 +600,14 @@ export default function AdminPage() {
           <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Gestão de Alunos e Conteúdo</p>
         </div>
 
+        {/* MUDANÇA 5: nova aba Config adicionada ao array de tabs */}
         <div className="flex bg-slate-900/80 p-1 rounded-2xl border border-white/5 shadow-2xl overflow-x-auto">
           {([
-            { key: 'content',   label: 'Conteúdo',  icon: <BookOpen size={16} /> },
-            { key: 'students',  label: 'Alunos',     icon: <Users size={16} /> },
-            { key: 'challenges',label: 'Desafios',   icon: <Trophy size={16} /> },
-            { key: 'approvals', label: 'Aprovações', icon: <ShieldCheck size={16} /> },
+            { key: 'content',    label: 'Conteúdo',   icon: <BookOpen size={16} /> },
+            { key: 'students',   label: 'Alunos',      icon: <Users size={16} /> },
+            { key: 'challenges', label: 'Desafios',    icon: <Trophy size={16} /> },
+            { key: 'approvals',  label: 'Aprovações',  icon: <ShieldCheck size={16} /> },
+            { key: 'settings',   label: 'Config',      icon: <Settings size={16} /> },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -569,85 +623,44 @@ export default function AdminPage() {
       </header>
 
       {/* ======================================================
-          ABA: CONTEÚDO
+          ABA: CONTEÚDO — sem alterações
       ====================================================== */}
       {activeTab === 'content' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
           <div className="lg:col-span-4 space-y-6">
 
-            {/* Formulário de Curso */}
             <div className="bg-slate-900/50 border border-brand-primary/20 p-6 rounded-[2rem]">
               <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                 <Briefcase className="text-brand-primary" size={20} />
                 {editingCourseId ? 'Editar Curso' : 'Novo Curso'}
               </h2>
               <form onSubmit={handleSaveCourse} className="space-y-4">
-                <input
-                  required
-                  value={newCourse.title}
-                  onChange={e => setNewCourse({ ...newCourse, title: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm"
-                  placeholder="Título"
-                />
-                <select
-                  value={newCourse.category}
-                  onChange={e => setNewCourse({ ...newCourse, category: e.target.value })}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-white text-sm"
-                >
+                <input required value={newCourse.title} onChange={e => setNewCourse({ ...newCourse, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm" placeholder="Título" />
+                <select value={newCourse.category} onChange={e => setNewCourse({ ...newCourse, category: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-white text-sm">
                   <option value="Tecnologia">Tecnologia</option>
                   <option value="Administrativo">Administrativo</option>
                   <option value="Teologia">Teologia</option>
                 </select>
-                <input
-                  value={newCourse.image_url}
-                  onChange={e => setNewCourse({ ...newCourse, image_url: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm"
-                  placeholder="URL da Capa"
-                />
-                <textarea
-                  value={newCourse.description}
-                  onChange={e => setNewCourse({ ...newCourse, description: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm h-20"
-                  placeholder="Descrição..."
-                />
-                <Button
-                  disabled={loading}
-                  className={`w-full font-bold h-12 rounded-xl uppercase ${editingCourseId ? 'bg-amber-500' : 'bg-brand-primary'} text-white`}
-                >
+                <input value={newCourse.image_url} onChange={e => setNewCourse({ ...newCourse, image_url: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm" placeholder="URL da Capa" />
+                <textarea value={newCourse.description} onChange={e => setNewCourse({ ...newCourse, description: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm h-20" placeholder="Descrição..." />
+                <Button disabled={loading} className={`w-full font-bold h-12 rounded-xl uppercase ${editingCourseId ? 'bg-amber-500' : 'bg-brand-primary'} text-white`}>
                   {loading ? <Loader2 className="animate-spin" size={16} /> : editingCourseId ? 'Atualizar Curso' : 'Salvar Curso'}
                 </Button>
                 {editingCourseId && (
-                  <button
-                    type="button"
-                    onClick={() => { setEditingCourseId(null); setNewCourse(INITIAL_COURSE); }}
-                    className="w-full text-slate-500 text-xs font-bold uppercase hover:text-white transition-colors"
-                  >
+                  <button type="button" onClick={() => { setEditingCourseId(null); setNewCourse(INITIAL_COURSE); }} className="w-full text-slate-500 text-xs font-bold uppercase hover:text-white transition-colors">
                     Cancelar edição
                   </button>
                 )}
               </form>
             </div>
 
-            {/* Listagem de Cursos existentes */}
             {courses.length > 0 && (
               <div className="bg-slate-900/30 border border-white/5 p-6 rounded-[2rem] space-y-3">
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4">Cursos Cadastrados</h3>
                 {courses.map(course => (
                   <div key={course.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
                     <span className="text-white text-sm font-bold truncate pr-4">{course.title}</span>
-                    <button
-                      onClick={() => {
-                        setEditingCourseId(course.id);
-                        setNewCourse({
-                          title:       course.title,
-                          category:    course.category,
-                          description: course.description,
-                          image_url:   course.image_url,
-                        });
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="text-slate-500 hover:text-brand-primary transition-colors flex-shrink-0"
-                    >
+                    <button onClick={() => { setEditingCourseId(course.id); setNewCourse({ title: course.title, category: course.category, description: course.description, image_url: course.image_url }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-slate-500 hover:text-brand-primary transition-colors flex-shrink-0">
                       <Pencil size={16} />
                     </button>
                   </div>
@@ -655,28 +668,16 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Formulário de Módulo */}
             <div className="bg-slate-900/50 border border-white/5 p-6 rounded-[2rem]">
               <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
                 <PlusCircle className="text-brand-secondary" size={20} /> Novo Módulo
               </h2>
               <form onSubmit={handleSaveModule} className="space-y-4">
-                <select
-                  required
-                  value={newModule.course_id}
-                  onChange={e => setNewModule({ ...newModule, course_id: e.target.value })}
-                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white text-sm"
-                >
+                <select required value={newModule.course_id} onChange={e => setNewModule({ ...newModule, course_id: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white text-sm">
                   <option value="">Curso...</option>
                   {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
                 </select>
-                <input
-                  required
-                  value={newModule.title}
-                  onChange={e => setNewModule({ ...newModule, title: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm"
-                  placeholder="Nome do Módulo"
-                />
+                <input required value={newModule.title} onChange={e => setNewModule({ ...newModule, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white text-sm" placeholder="Nome do Módulo" />
                 <Button disabled={loading} className="w-full bg-slate-800 text-white font-bold h-12 rounded-xl">
                   {loading ? <Loader2 className="animate-spin" size={16} /> : 'Criar Módulo'}
                 </Button>
@@ -685,69 +686,37 @@ export default function AdminPage() {
           </div>
 
           <div className="lg:col-span-8 space-y-8">
-
-            {/* Formulário de Aula */}
             <div className="bg-slate-900/50 border border-white/5 p-8 rounded-[2.5rem]">
               <h2 className="text-xl font-bold text-white mb-8 flex items-center gap-2">
                 <Video className="text-brand-primary" size={24} /> Publicar Aula
               </h2>
               <form onSubmit={handleSaveLesson} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <select
-                  required
-                  value={newLesson.module_id}
-                  onChange={e => setNewLesson({ ...newLesson, module_id: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                >
+                <select required value={newLesson.module_id} onChange={e => setNewLesson({ ...newLesson, module_id: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white">
                   <option value="">Módulo...</option>
                   {modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
                 </select>
-                <input
-                  required
-                  value={newLesson.title}
-                  onChange={e => setNewLesson({ ...newLesson, title: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                  placeholder="Título da Aula"
-                />
-                <input
-                  value={newLesson.video_url}
-                  onChange={e => setNewLesson({ ...newLesson, video_url: e.target.value })}
-                  className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                  placeholder="URL do Vídeo (YouTube)"
-                />
-                <textarea
-                  value={newLesson.content}
-                  onChange={e => setNewLesson({ ...newLesson, content: e.target.value })}
-                  className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32"
-                  placeholder="Conteúdo / Resumo da aula..."
-                />
+                <input required value={newLesson.title} onChange={e => setNewLesson({ ...newLesson, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Título da Aula" />
+                <input value={newLesson.video_url} onChange={e => setNewLesson({ ...newLesson, video_url: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="URL do Vídeo (YouTube)" />
+                <textarea value={newLesson.content} onChange={e => setNewLesson({ ...newLesson, content: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32" placeholder="Conteúdo / Resumo da aula..." />
                 <Button disabled={loading} className="md:col-span-2 h-14 bg-brand-primary text-white font-bold rounded-2xl uppercase">
                   {loading ? <Loader2 className="animate-spin" size={16} /> : 'Publicar Aula'}
                 </Button>
               </form>
             </div>
 
-            {/* Lista para Reaproveitar Aulas */}
             <div className="bg-slate-900/30 border border-white/5 p-8 rounded-[2.5rem]">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <Copy className="text-brand-secondary" size={20} /> Reaproveitar Aulas
               </h2>
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-                {lessons.length === 0 && (
-                  <p className="text-slate-600 text-sm font-bold uppercase text-center py-8">Nenhuma aula cadastrada.</p>
-                )}
+                {lessons.length === 0 && <p className="text-slate-600 text-sm font-bold uppercase text-center py-8">Nenhuma aula cadastrada.</p>}
                 {lessons.map(lesson => (
                   <div key={lesson.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-all">
                     <div>
                       <p className="text-white font-bold text-sm">{lesson.title}</p>
-                      <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">
-                        {lesson.modules?.title || 'Sem módulo'}
-                      </p>
+                      <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">{lesson.modules?.title || 'Sem módulo'}</p>
                     </div>
-                    <Button
-                      onClick={() => setDuplicateTarget(lesson)}
-                      variant="outline"
-                      className="h-9 gap-2 border-brand-secondary/50 text-brand-secondary hover:bg-brand-secondary hover:text-white flex-shrink-0"
-                    >
+                    <Button onClick={() => setDuplicateTarget(lesson)} variant="outline" className="h-9 gap-2 border-brand-secondary/50 text-brand-secondary hover:bg-brand-secondary hover:text-white flex-shrink-0">
                       <Copy size={14} /> Duplicar
                     </Button>
                   </div>
@@ -759,7 +728,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: ALUNOS
+          ABA: ALUNOS — sem alterações
       ====================================================== */}
       {activeTab === 'students' && (
         <div className="max-w-3xl mx-auto animate-in fade-in duration-500">
@@ -771,39 +740,12 @@ export default function AdminPage() {
               O aluno receberá acesso imediato sem e-mail de confirmação.
             </p>
             <form onSubmit={handleCreateStudent} className="space-y-6">
-              <input
-                required
-                value={studentForm.fullName}
-                onChange={e => setStudentForm({ ...studentForm, fullName: e.target.value })}
-                className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                placeholder="Nome Completo"
-              />
+              <input required value={studentForm.fullName} onChange={e => setStudentForm({ ...studentForm, fullName: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Nome Completo" />
               <div className="grid grid-cols-2 gap-4">
-                <input
-                  required
-                  type="email"
-                  autoComplete="off"
-                  value={studentForm.email}
-                  onChange={e => setStudentForm({ ...studentForm, email: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                  placeholder="E-mail"
-                />
-                <input
-                  required
-                  type="password"
-                  autoComplete="new-password"
-                  value={studentForm.password}
-                  onChange={e => setStudentForm({ ...studentForm, password: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                  placeholder="Senha"
-                />
+                <input required type="email" autoComplete="off" value={studentForm.email} onChange={e => setStudentForm({ ...studentForm, email: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="E-mail" />
+                <input required type="password" autoComplete="new-password" value={studentForm.password} onChange={e => setStudentForm({ ...studentForm, password: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Senha" />
               </div>
-              <select
-                required
-                value={studentForm.selectedCourse}
-                onChange={e => setStudentForm({ ...studentForm, selectedCourse: e.target.value })}
-                className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white"
-              >
+              <select required value={studentForm.selectedCourse} onChange={e => setStudentForm({ ...studentForm, selectedCourse: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white">
                 <option value="">Selecione o Curso...</option>
                 {courses.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
               </select>
@@ -816,7 +758,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: DESAFIOS
+          ABA: DESAFIOS — sem alterações
       ====================================================== */}
       {activeTab === 'challenges' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
@@ -826,34 +768,11 @@ export default function AdminPage() {
                 <Book className="text-brand-primary" /> Novo Desafio
               </h2>
               <form onSubmit={handleSaveChallenge} className="space-y-4">
-                <input
-                  required
-                  value={newChallenge.title}
-                  onChange={e => setNewChallenge({ ...newChallenge, title: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                  placeholder="Título"
-                />
-                <textarea
-                  required
-                  value={newChallenge.description}
-                  onChange={e => setNewChallenge({ ...newChallenge, description: e.target.value })}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32"
-                  placeholder="Descrição"
-                />
+                <input required value={newChallenge.title} onChange={e => setNewChallenge({ ...newChallenge, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Título" />
+                <textarea required value={newChallenge.description} onChange={e => setNewChallenge({ ...newChallenge, description: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32" placeholder="Descrição" />
                 <div className="grid grid-cols-2 gap-4">
-                  <input
-                    type="number"
-                    min={1}
-                    value={newChallenge.xp_reward}
-                    onChange={e => setNewChallenge({ ...newChallenge, xp_reward: parseInt(e.target.value) || 0 })}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
-                    placeholder="XP"
-                  />
-                  <select
-                    value={newChallenge.difficulty}
-                    onChange={e => setNewChallenge({ ...newChallenge, difficulty: e.target.value })}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white"
-                  >
+                  <input type="number" min={1} value={newChallenge.xp_reward} onChange={e => setNewChallenge({ ...newChallenge, xp_reward: parseInt(e.target.value) || 0 })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="XP" />
+                  <select value={newChallenge.difficulty} onChange={e => setNewChallenge({ ...newChallenge, difficulty: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white">
                     <option value="Fácil">Fácil</option>
                     <option value="Médio">Médio</option>
                     <option value="Difícil">Difícil</option>
@@ -865,14 +784,9 @@ export default function AdminPage() {
               </form>
             </div>
           </div>
-
           <div className="lg:col-span-7">
             <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-              {challenges.length === 0 && (
-                <p className="text-slate-600 text-sm font-bold uppercase text-center py-12">
-                  Nenhum desafio criado ainda.
-                </p>
-              )}
+              {challenges.length === 0 && <p className="text-slate-600 text-sm font-bold uppercase text-center py-12">Nenhum desafio criado ainda.</p>}
               {challenges.map(chall => (
                 <div key={chall.id} className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem] flex items-center justify-between">
                   <div>
@@ -880,16 +794,8 @@ export default function AdminPage() {
                     <span className="text-brand-primary text-xs font-black">+{chall.xp_reward} XP</span>
                     <span className="ml-3 text-slate-500 text-xs font-bold">{chall.difficulty}</span>
                   </div>
-                  <button
-                    onClick={() => setDeleteTarget(chall)}
-                    disabled={deletingId === chall.id}
-                    className="text-slate-600 hover:text-red-500 transition-colors p-2 disabled:opacity-50"
-                    title="Excluir desafio"
-                  >
-                    {deletingId === chall.id
-                      ? <Loader2 size={18} className="animate-spin" />
-                      : <Trash2 size={18} />
-                    }
+                  <button onClick={() => setDeleteTarget(chall)} disabled={deletingId === chall.id} className="text-slate-600 hover:text-red-500 transition-colors p-2 disabled:opacity-50" title="Excluir desafio">
+                    {deletingId === chall.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
                   </button>
                 </div>
               ))}
@@ -899,7 +805,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: APROVAÇÕES
+          ABA: APROVAÇÕES — sem alterações
       ====================================================== */}
       {activeTab === 'approvals' && (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -921,34 +827,110 @@ export default function AdminPage() {
 
           <div className="grid grid-cols-1 gap-6">
             {submissions.map(sub => (
-              <div
-                key={sub.id}
-                className="bg-slate-900/80 border border-white/5 p-8 rounded-[2.5rem] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 hover:border-brand-primary/20 transition-all"
-              >
+              <div key={sub.id} className="bg-slate-900/80 border border-white/5 p-8 rounded-[2.5rem] flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8 hover:border-brand-primary/20 transition-all">
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold text-white uppercase italic">{sub.profiles?.full_name}</h3>
                   <p className="text-slate-500 text-xs font-medium">Desafio: {sub.challenges?.title}</p>
                   <span className="text-brand-primary text-xs font-black">+{sub.challenges?.xp_reward} XP</span>
                 </div>
                 <div className="flex items-center gap-4">
-                  <a
-                    href={sub.solution_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 bg-white/5 text-white px-6 py-4 rounded-2xl text-xs font-black border border-white/5 hover:bg-white/10 transition-all"
-                  >
+                  <a href={sub.solution_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white/5 text-white px-6 py-4 rounded-2xl text-xs font-black border border-white/5 hover:bg-white/10 transition-all">
                     <Eye size={16} /> Ver
                   </a>
-                  <Button
-                    onClick={() => handleApproveSubmission(sub)}
-                    disabled={approvingId !== null}
-                    className="bg-brand-primary text-white px-8 py-4 h-auto rounded-2xl text-xs font-black uppercase"
-                  >
+                  <Button onClick={() => handleApproveSubmission(sub)} disabled={approvingId !== null} className="bg-brand-primary text-white px-8 py-4 h-auto rounded-2xl text-xs font-black uppercase">
                     {approvingId === sub.id ? <Loader2 className="animate-spin" size={16} /> : 'Aprovar'}
                   </Button>
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          ABA: CONFIGURAÇÕES — nova aba
+      ====================================================== */}
+      {activeTab === 'settings' && (
+        <div className="max-w-lg mx-auto animate-in fade-in duration-500">
+          <div className="bg-slate-900/50 border border-white/5 p-10 rounded-[2.5rem] space-y-8">
+
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 bg-brand-primary/10 border border-brand-primary/20 rounded-[1.5rem] flex items-center justify-center">
+                <KeyRound className="text-brand-primary" size={28} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-white uppercase italic">Senha de Validação</h2>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
+                  Professor digita para confirmar conclusão de aulas
+                </p>
+              </div>
+            </div>
+
+            {/* Senha atual */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex items-center justify-between">
+              <div>
+                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1">Senha Atual</p>
+                <p className="text-white font-black text-lg tracking-widest font-mono">
+                  {showPasswords ? currentPassword : '•'.repeat(currentPassword.length || 6)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPasswords(p => !p)}
+                className="text-slate-500 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/5"
+              >
+                <Eye size={18} />
+              </button>
+            </div>
+
+            {/* Form nova senha */}
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">
+                  Nova Senha
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input
+                    required
+                    type={showPasswords ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    placeholder="Mínimo 4 caracteres"
+                    minLength={4}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-primary/50 transition-all font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2 block">
+                  Confirmar Nova Senha
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                  <input
+                    required
+                    type={showPasswords ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Repita a nova senha"
+                    minLength={4}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-primary/50 transition-all font-bold"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loadingPassword || !newPassword || !confirmPassword}
+                className="w-full h-14 bg-brand-primary hover:bg-brand-primary/90 text-white font-black uppercase italic rounded-2xl transition-all active:scale-95 disabled:opacity-50 mt-2"
+              >
+                {loadingPassword
+                  ? <Loader2 className="animate-spin" size={20} />
+                  : 'Atualizar Senha'
+                }
+              </Button>
+            </form>
           </div>
         </div>
       )}

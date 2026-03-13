@@ -5,19 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import {
-  ArrowLeft,
-  CheckCircle2,
-  Loader2,
-  FileText,
-  Trophy,
-  ChevronRight,
-  Download,
-  Eye,
-  PartyPopper,
-  AlertCircle,
+  ArrowLeft, CheckCircle2, Loader2, FileText,
+  Trophy, ChevronRight, Download, Eye, PartyPopper, AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { ValidationModal } from '@/components/dashboard/ValidationModal';
 
 // ============================================================
 // TIPOS
@@ -79,13 +72,14 @@ export default function LessonDetailsPage() {
 
   const lessonId = Array.isArray(id) ? id[0] : id;
 
-  const [lesson, setLesson]             = useState<Lesson | null>(null);
-  const [hasQuiz, setHasQuiz]           = useState(false);
-  const [loading, setLoading]           = useState(true);
-  const [isCompleting, setIsCompleting] = useState(false);
-  const [isDone, setIsDone]             = useState(false);
-  const [downloading, setDownloading]   = useState(false);
-  const [toast, setToast]               = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [lesson, setLesson]               = useState<Lesson | null>(null);
+  const [hasQuiz, setHasQuiz]             = useState(false);
+  const [loading, setLoading]             = useState(true);
+  const [isCompleting, setIsCompleting]   = useState(false);
+  const [isDone, setIsDone]               = useState(false);
+  const [downloading, setDownloading]     = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+  const [toast, setToast]                 = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const notify = (type: 'success' | 'error', text: string) => {
     setToast({ type, text });
@@ -97,15 +91,11 @@ export default function LessonDetailsPage() {
   // ----------------------------------------------------------
   const fetchLessonData = useCallback(async () => {
     if (!lessonId) return;
-
     try {
       setLoading(true);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
+      if (!user) { router.push('/login'); return; }
 
       const [lessonRes, progressRes, quizRes] = await Promise.all([
         supabase
@@ -113,14 +103,12 @@ export default function LessonDetailsPage() {
           .select('*, modules(id, title, course_id)')
           .eq('id', lessonId)
           .single(),
-
         supabase
           .from('lesson_progress')
           .select('id')
           .eq('user_id', user.id)
           .eq('lesson_id', lessonId)
           .maybeSingle(),
-
         supabase
           .from('quizzes')
           .select('id')
@@ -128,14 +116,10 @@ export default function LessonDetailsPage() {
           .maybeSingle(),
       ]);
 
-      if (lessonRes.error || !lessonRes.data) {
-        router.push('/dashboard');
-        return;
-      }
+      if (lessonRes.error || !lessonRes.data) { router.push('/dashboard'); return; }
 
       const lessonData = lessonRes.data as Lesson;
 
-      // maybeSingle — não joga erro se matrícula não existir
       const { data: enrollment } = await supabase
         .from('enrollments')
         .select('id')
@@ -143,10 +127,7 @@ export default function LessonDetailsPage() {
         .eq('product_id', lessonData.modules?.course_id ?? '')
         .maybeSingle();
 
-      if (!enrollment) {
-        router.push('/dashboard');
-        return;
-      }
+      if (!enrollment) { router.push('/dashboard'); return; }
 
       setLesson(lessonData);
       if (progressRes.data) setIsDone(true);
@@ -166,12 +147,10 @@ export default function LessonDetailsPage() {
     }
   }, [lessonId, router]);
 
-  useEffect(() => {
-    fetchLessonData();
-  }, [fetchLessonData]);
+  useEffect(() => { fetchLessonData(); }, [fetchLessonData]);
 
   // ----------------------------------------------------------
-  // CONCLUIR AULA + XP
+  // CONCLUIR AULA — chamado após validação da senha
   // ----------------------------------------------------------
   const handleCompleteLesson = async () => {
     if (isDone || isCompleting) return;
@@ -180,12 +159,9 @@ export default function LessonDetailsPage() {
       setIsCompleting(true);
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/login');
-        return;
-      }
+      if (!user) { router.push('/login'); return; }
 
-      // 1. Proteção dupla contra XP duplicado
+      // Proteção dupla contra XP duplicado
       const { data: existingProgress } = await supabase
         .from('lesson_progress')
         .select('id')
@@ -193,21 +169,17 @@ export default function LessonDetailsPage() {
         .eq('lesson_id', lessonId)
         .maybeSingle();
 
-      if (existingProgress) {
-        setIsDone(true);
-        return;
-      }
+      if (existingProgress) { setIsDone(true); return; }
 
-      // 2. Registra progresso com insert direto
+      // Registra progresso
       const { error: progressError } = await supabase
         .from('lesson_progress')
         .insert({ user_id: user.id, lesson_id: lessonId, is_completed: true });
 
       if (progressError) throw progressError;
 
-      // 3. Atualiza XP — busca atual e soma
+      // Atualiza XP
       const xpReward = lesson?.xp_reward ?? 0;
-
       if (xpReward > 0) {
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
@@ -225,7 +197,6 @@ export default function LessonDetailsPage() {
         if (xpError) throw xpError;
       }
 
-      // 4. Feedback visual
       setIsDone(true);
       notify('success', `+${xpReward} XP conquistado!`);
 
@@ -275,6 +246,13 @@ export default function LessonDetailsPage() {
   return (
     <div className="min-h-screen pb-24 px-4 md:px-8">
 
+      {/* Modal de validação do professor */}
+      <ValidationModal
+        isOpen={showValidation}
+        onClose={() => setShowValidation(false)}
+        onSuccess={handleCompleteLesson}
+      />
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-5 right-5 z-50 p-4 rounded-2xl border shadow-2xl animate-in slide-in-from-right-4 flex items-center gap-3 font-bold uppercase text-xs ${
@@ -282,10 +260,7 @@ export default function LessonDetailsPage() {
             ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500'
             : 'bg-red-500/10 border-red-500 text-red-500'
         }`}>
-          {toast.type === 'success'
-            ? <CheckCircle2 size={16} />
-            : <AlertCircle size={16} />
-          }
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
           {toast.text}
         </div>
       )}
@@ -295,23 +270,16 @@ export default function LessonDetailsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           {moduleId ? (
-            <Link
-              href={`/dashboard/modules/${moduleId}`}
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
-            >
+            <Link href={`/dashboard/modules/${moduleId}`} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group">
               <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
               <span className="text-xs font-black uppercase tracking-widest italic">Voltar ao Módulo</span>
             </Link>
           ) : (
-            <Link
-              href="/dashboard"
-              className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
-            >
+            <Link href="/dashboard" className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group">
               <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
               <span className="text-xs font-black uppercase tracking-widest italic">Voltar ao Dashboard</span>
             </Link>
           )}
-
           <div className="flex items-center gap-3 bg-white/5 px-4 py-2 rounded-2xl border border-white/10 max-w-[50%]">
             <span className="text-[10px] font-black text-brand-primary uppercase tracking-widest italic truncate">
               {lesson.modules?.title}
@@ -323,23 +291,15 @@ export default function LessonDetailsPage() {
 
           {/* Coluna Principal */}
           <div className="lg:col-span-8 space-y-8">
-
             {videoEmbedUrl ? (
               <div className="aspect-video w-full bg-slate-900 rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl">
-                <iframe
-                  src={videoEmbedUrl}
-                  className="w-full h-full"
-                  allowFullScreen
-                  title={lesson.title}
-                />
+                <iframe src={videoEmbedUrl} className="w-full h-full" allowFullScreen title={lesson.title} />
               </div>
             ) : (
               <div className="aspect-video w-full bg-slate-900/50 rounded-[2.5rem] border-2 border-dashed border-white/10 flex flex-col items-center justify-center p-8 text-center">
                 <FileText className="text-brand-primary mb-4" size={48} />
                 <h3 className="text-white font-black text-xl italic uppercase">Material de Estudo</h3>
-                <p className="text-slate-500 text-sm italic font-medium">
-                  Esta aula foca no conteúdo escrito e atividades.
-                </p>
+                <p className="text-slate-500 text-sm italic font-medium">Esta aula foca no conteúdo escrito e atividades.</p>
               </div>
             )}
 
@@ -350,15 +310,10 @@ export default function LessonDetailsPage() {
               <div className="flex gap-3 flex-wrap">
                 <div className="flex items-center gap-2 px-3 py-1 bg-yellow-500/10 rounded-full border border-yellow-500/20">
                   <Trophy size={14} className="text-yellow-500" />
-                  <span className="text-[10px] font-black text-yellow-500 uppercase">
-                    Vale {lesson.xp_reward} XP
-                  </span>
+                  <span className="text-[10px] font-black text-yellow-500 uppercase">Vale {lesson.xp_reward} XP</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1 bg-brand-primary/10 rounded-full border border-brand-primary/20">
-                  <CheckCircle2
-                    size={14}
-                    className={isDone ? 'text-brand-primary' : 'text-slate-500'}
-                  />
+                  <CheckCircle2 size={14} className={isDone ? 'text-brand-primary' : 'text-slate-500'} />
                   <span className="text-[10px] font-black uppercase text-slate-400">
                     {isDone ? 'Concluída' : 'Em progresso'}
                   </span>
@@ -371,18 +326,16 @@ export default function LessonDetailsPage() {
                 <FileText className="text-brand-primary" size={20} /> Resumo da Aula
               </h2>
               <div className="prose prose-invert max-w-none text-slate-400 leading-relaxed font-medium">
-                {lesson.content ? (
-                  <div className="whitespace-pre-wrap">{lesson.content}</div>
-                ) : (
-                  <p className="italic text-slate-600">Nenhum resumo disponível para esta aula.</p>
-                )}
+                {lesson.content
+                  ? <div className="whitespace-pre-wrap">{lesson.content}</div>
+                  : <p className="italic text-slate-600">Nenhum resumo disponível para esta aula.</p>
+                }
               </div>
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="lg:col-span-4 space-y-6">
-
             {hasQuiz && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -403,16 +356,13 @@ export default function LessonDetailsPage() {
 
             <div className="bg-slate-900/60 border border-white/10 p-8 rounded-[2.5rem] backdrop-blur-md">
               <h4 className="text-white font-black uppercase italic tracking-widest text-xs mb-6 flex items-center gap-2">
-                <CheckCircle2
-                  size={16}
-                  className={isDone ? 'text-brand-primary' : 'text-slate-500'}
-                />
+                <CheckCircle2 size={16} className={isDone ? 'text-brand-primary' : 'text-slate-500'} />
                 Status do Aluno
               </h4>
 
               {!isDone ? (
                 <Button
-                  onClick={handleCompleteLesson}
+                  onClick={() => setShowValidation(true)}
                   disabled={isCompleting || hasQuiz}
                   className="w-full min-h-[4rem] py-4 px-4 bg-brand-primary hover:bg-brand-primary/90 text-white font-black uppercase italic tracking-wider text-xs rounded-2xl shadow-lg shadow-brand-primary/20 transition-all active:scale-95 disabled:opacity-50 whitespace-normal leading-tight text-center"
                 >
