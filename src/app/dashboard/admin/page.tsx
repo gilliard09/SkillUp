@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { Button } from '@/components/ui/button';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   PlusCircle, Video, CheckCircle2,
@@ -12,6 +11,17 @@ import {
   UserPlus, ShieldCheck, AlertCircle, Eye, Copy, Pencil, X,
   Settings, Lock, KeyRound, Sparkles, Building2, Link, FileText
 } from 'lucide-react';
+
+// Botão simples para substituir o que está faltando
+const Button = ({ children, className, disabled, ...props }: any) => (
+  <button 
+    disabled={disabled}
+    className={`${className} disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95`}
+    {...props}
+  >
+    {children}
+  </button>
+);
 
 // ============================================================
 // TIPOS
@@ -402,20 +412,36 @@ export default function AdminPage() {
   };
 
   const handleGenerateQuiz = async () => {
-    if (!quizLesson) { notify('error', 'Selecione uma aula.'); return; }
-    setGeneratingQuiz(true); setGeneratedQs([]);
-    try {
-      const lesson = lessons.find(l => l.id === quizLesson);
-      const res = await fetch('/api/generate-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lessonTitle: lesson?.title ?? '', lessonContent: lesson?.content ?? '', questionCount: quizQuestionCount }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setGeneratedQs(data.questions); notify('success', 'Gerado!');
-    } catch (err: any) { notify('error', err.message); } finally { setGeneratingQuiz(false); }
-  };
+  if (!quizLesson) return alert("Selecione uma aula primeiro!");
+  
+  setGeneratingQuiz(true);
+  try {
+    const lesson = lessons.find(l => l.id === quizLesson);
+    
+    const response = await fetch('/api/generate-quiz', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lessonTitle: lesson?.title,
+        lessonContent: lesson?.content || "Conteúdo geral da aula", // Garante que não vá vazio
+        questionCount: 5
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.questions) {
+      setGeneratedQs(data.questions);
+    } else {
+      throw new Error(data.error || "Erro desconhecido");
+    }
+  } catch (error: any) {
+    console.error("Erro ao gerar quiz:", error);
+    alert("Não foi possível gerar o quiz com IA: " + error.message);
+  } finally {
+    setGeneratingQuiz(false);
+  }
+};
 
   const handleSaveQuiz = async () => {
     if (!quizLesson || generatedQs.length === 0) return;

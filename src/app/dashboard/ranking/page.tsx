@@ -9,6 +9,8 @@ import {
   TrendingUp, Instagram, CheckCircle2, AlertCircle, Clock
 } from 'lucide-react';
 
+
+
 // ============================================================
 // TIPOS
 // ============================================================

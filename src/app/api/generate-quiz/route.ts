@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { NextResponse } from "next/server";
 
-// Agora buscamos a variável SEM o NEXT_PUBLIC (mais seguro e padrão de servidor)
+// Busca a chave direto do ambiente da Vercel
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 
 export async function POST(req: Request) {
@@ -9,7 +9,7 @@ export async function POST(req: Request) {
     const { lessonTitle, lessonContent, questionCount } = await req.json();
 
     if (!process.env.GEMINI_API_KEY) {
-       return NextResponse.json({ error: "Chave GEMINI_API_KEY não encontrada no ambiente da Vercel." }, { status: 500 });
+      throw new Error("Chave GEMINI_API_KEY não configurada na Vercel.");
     }
 
     const model = genAI.getGenerativeModel({ 
@@ -22,13 +22,14 @@ export async function POST(req: Request) {
       ],
     });
 
-    const prompt = `Gere um quiz educacional em JSON sobre ${lessonTitle}. Conteúdo: ${lessonContent}. ${questionCount} questões.`;
+    const prompt = `Gere um quiz educacional sobre ${lessonTitle}. Conteúdo: ${lessonContent}. Gere ${questionCount} questões. Retorne APENAS o JSON puro.`;
 
     const result = await model.generateContent(prompt);
     const text = result.response.text().replace(/```json|```/g, "").trim();
     
     return NextResponse.json({ questions: JSON.parse(text) });
   } catch (error: any) {
+    console.error(error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
