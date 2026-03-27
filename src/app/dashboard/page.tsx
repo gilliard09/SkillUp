@@ -25,6 +25,9 @@ type Course = {
 type Profile = {
   full_name: string | null;
   xp: number;
+  streak: number;
+  last_practice_date: string | null;
+  organization_id: string | null; // NOVA MUDANÇA: Adicionado campo de organização
 };
 
 type Level = {
@@ -36,7 +39,7 @@ type Level = {
 };
 
 // ============================================================
-// CONSTANTES — fora do componente para não recriar a cada render
+// CONSTANTES
 // ============================================================
 const LEVELS: Level[] = [
   { min: 5000, name: 'Lendário Digital',       color: 'text-purple-400',    bg: 'bg-purple-400/10',    border: 'border-purple-400/20'    },
@@ -55,20 +58,135 @@ function getNextLevel(xp: number): Level | null {
   return [...LEVELS].reverse().find(l => l.min > xp) ?? null;
 }
 
+function practicedToday(lastDate: string | null): boolean {
+  if (!lastDate) return false;
+  return new Date(lastDate).toDateString() === new Date().toDateString();
+}
+
 // ============================================================
-// COMPONENTE
+// COMPONENTE CARD DE SEQUÊNCIA
+// ============================================================
+function SequenciaCard({ streak, practicedToday: doneToday }: { streak: number; practicedToday: boolean }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+      className="mb-10"
+    >
+      <Link href="/dashboard/sequencia">
+        <div className={`relative overflow-hidden rounded-[2rem] border p-6 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
+          doneToday
+            ? 'bg-[#4A2080]/15 border-[#4A2080]/30'
+            : 'bg-slate-900/60 border-white/10'
+        }`}>
+
+          {doneToday && (
+            <div className="absolute inset-0 bg-[#4A2080]/10 blur-2xl -z-10 rounded-[2rem]" />
+          )}
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`h-14 w-14 rounded-[1.25rem] flex items-center justify-center shadow-lg flex-shrink-0 ${
+                doneToday
+                  ? 'bg-[#4A2080] shadow-[0_0_20px_rgba(74,32,128,0.4)]'
+                  : 'bg-slate-800 border border-white/10'
+              }`}>
+                <Zap
+                  size={28}
+                  className={doneToday ? 'text-white' : 'text-slate-500'}
+                  fill={doneToday ? 'white' : 'none'}
+                />
+              </div>
+
+              <div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
+                  Sequência
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-3xl font-black italic ${
+                    doneToday ? 'text-[#7B4FBF]' : 'text-slate-400'
+                  }`}>
+                    {streak}
+                  </span>
+                  <span className="text-slate-500 text-sm font-bold uppercase tracking-widest">
+                    {streak === 1 ? 'dia' : 'dias'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-right">
+              {doneToday ? (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] font-black text-[#7B4FBF] uppercase tracking-widest">
+                    Completo hoje ⚡
+                  </span>
+                  <span className="text-slate-600 text-[9px] font-bold uppercase">
+                    Volte amanhã
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                    Praticar hoje
+                  </span>
+                  <span className="text-brand-primary text-[9px] font-black uppercase tracking-wider">
+                    Não perca a sequência →
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-5 flex gap-2">
+            {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
+              const today = new Date().getDay();
+              const isPast   = i < today;
+              const isToday  = i === today;
+              const isFuture = i > today;
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
+                  <div className={`w-full h-1.5 rounded-full ${
+                    isToday && doneToday
+                      ? 'bg-[#4A2080]'
+                      : isToday
+                      ? 'bg-white/20'
+                      : isPast && streak > (today - i)
+                      ? 'bg-[#4A2080]/60'
+                      : isFuture
+                      ? 'bg-white/5'
+                      : 'bg-white/10'
+                  }`} />
+                  <span className={`text-[8px] font-black uppercase ${
+                    isToday ? 'text-white' : 'text-slate-700'
+                  }`}>{day}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+// ============================================================
+// PÁGINA PRINCIPAL
 // ============================================================
 export default function DashboardPage() {
   const router = useRouter();
 
   const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showLevelUp, setShowLevelUp] = useState(false);
-  const [globalProgress, setGlobalProgress] = useState(0);
-  const [previousXp, setPreviousXp] = useState<number | null>(null);
+  const [profile, setProfile]                 = useState<Profile | null>(null);
+  const [loading, setLoading]                 = useState(true);
+  const [showLevelUp, setShowLevelUp]         = useState(false);
+  const [globalProgress, setGlobalProgress]   = useState(0);
+  const [previousXp, setPreviousXp]           = useState<number | null>(null);
 
-  const xp = profile?.xp ?? 0;
+  const xp           = profile?.xp ?? 0;
+  const streak       = profile?.streak ?? 0;
+  const doneToday    = practicedToday(profile?.last_practice_date ?? null);
   const currentLevel = useMemo(() => getCurrentLevel(xp), [xp]);
   const nextLevel    = useMemo(() => getNextLevel(xp), [xp]);
   const xpToNext     = nextLevel ? nextLevel.min - xp : 0;
@@ -79,13 +197,15 @@ export default function DashboardPage() {
         setLoading(true);
 
         const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          router.push('/login');
-          return;
-        }
+        if (!user) { router.push('/login'); return; }
 
+        // NOVA MUDANÇA: Adicionado organization_id na query do perfil
         const [profileRes, enrollmentsRes] = await Promise.all([
-          supabase.from('profiles').select('full_name, xp').eq('id', user.id).maybeSingle(),
+          supabase
+            .from('profiles')
+            .select('full_name, xp, streak, last_practice_date, organization_id')
+            .eq('id', user.id)
+            .maybeSingle(),
           supabase.from('enrollments').select('product_id').eq('user_id', user.id),
         ]);
 
@@ -143,28 +263,23 @@ export default function DashboardPage() {
     }
 
     fetchDashboardData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, previousXp]);
 
   const categories = useMemo(
     () => Array.from(new Set(enrolledCourses.map(c => c.category ?? 'Geral'))),
     [enrolledCourses]
   );
 
-  // Loading — sem bg próprio, herda do layout
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-brand-primary">
+      <div className="min-h-screen flex items-center justify-center text-brand-primary bg-slate-950">
         <Loader2 className="animate-spin" size={40} />
       </div>
     );
   }
 
   return (
-    // SEM bg aqui — herdado do DashboardLayout
-    <div className="pb-24 overflow-hidden relative font-sans">
-
-      {/* Glows decorativos — fixed para cobrir sidebar também */}
+    <div className="pb-24 overflow-hidden relative font-sans bg-slate-950 min-h-screen">
       <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-brand-primary/10 blur-[120px] -z-10 rounded-full pointer-events-none" />
       <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/10 blur-[120px] -z-10 rounded-full pointer-events-none" />
 
@@ -182,12 +297,11 @@ export default function DashboardPage() {
       />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
-
         {nextLevel && (
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="mb-12 -mt-8 flex items-center gap-4 bg-slate-900/60 border border-white/10 p-2 pr-6 rounded-full backdrop-blur-md w-fit shadow-xl"
+            className="mb-8 -mt-8 flex items-center gap-4 bg-slate-900/60 border border-white/10 p-2 pr-6 rounded-full backdrop-blur-md w-fit shadow-xl"
           >
             <div className={`h-10 w-10 rounded-full ${nextLevel.bg} flex items-center justify-center ${nextLevel.color} shadow-lg`}>
               <Zap size={18} fill="currentColor" />
@@ -202,6 +316,8 @@ export default function DashboardPage() {
             </p>
           </motion.div>
         )}
+
+        <SequenciaCard streak={streak} practicedToday={doneToday} />
 
         {enrolledCourses.length === 0 ? (
           <div className="max-w-md mx-auto text-center py-24 bg-slate-900/40 rounded-[3rem] border border-dashed border-white/10 px-8 mt-12">
@@ -230,7 +346,6 @@ export default function DashboardPage() {
                       transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                       className="group relative rounded-[2.5rem] overflow-hidden h-72 shadow-2xl"
                     >
-                      {/* Imagem de fundo */}
                       <div className="absolute inset-0 z-0">
                         <Image
                           src={course.image_url ?? '/placeholder-course.png'}
@@ -239,13 +354,11 @@ export default function DashboardPage() {
                           className="object-cover transition-transform duration-700 group-hover:scale-105 brightness-50"
                           sizes="(max-width: 768px) 100vw, 50vw"
                         />
-                        {/* Gradiente dissolve no bg-slate-950 do layout */}
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
                         <div className="absolute inset-0 bg-gradient-to-r from-slate-950/60 via-transparent to-transparent" />
                         <div className="absolute inset-0 bg-brand-primary/0 group-hover:bg-brand-primary/5 transition-all duration-500" />
                       </div>
 
-                      {/* Conteúdo sobreposto */}
                       <div className="relative z-10 p-8 flex flex-col justify-end h-full w-full">
                         <span className="px-2 py-0.5 rounded-md bg-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-widest italic border border-brand-primary/30 w-fit mb-3">
                           Disponível

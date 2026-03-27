@@ -4,19 +4,21 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { LayoutGrid, Sword, Trophy, User, ShieldCheck } from 'lucide-react';
+import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap } from 'lucide-react';
 
 type NavItem = {
   icon: React.ElementType;
   label: string;
   href: string;
+  isSequencia?: boolean;
 };
 
 const BASE_ITEMS: NavItem[] = [
-  { icon: LayoutGrid, label: 'Início',   href: '/dashboard' },
-  { icon: Sword,      label: 'Desafios', href: '/dashboard/challenges' },
-  { icon: Trophy,     label: 'Ranking',  href: '/dashboard/ranking' },
-  { icon: User,       label: 'Perfil',   href: '/dashboard/profile' },
+  { icon: LayoutGrid, label: 'Início',    href: '/dashboard' },
+  { icon: Zap,        label: 'Sequência', href: '/dashboard/sequencia', isSequencia: true },
+  { icon: Sword,      label: 'Desafios',  href: '/dashboard/challenges' },
+  { icon: Trophy,     label: 'Ranking',   href: '/dashboard/ranking' },
+  { icon: User,       label: 'Perfil',    href: '/dashboard/profile' },
 ];
 
 const ADMIN_ITEM: NavItem = {
@@ -33,24 +35,21 @@ function isItemActive(href: string, pathname: string): boolean {
 export function MobileNav() {
   const pathname = usePathname();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [streak, setStreak] = useState(0);
 
   useEffect(() => {
     const checkRole = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('USER:', user?.id);
       if (!user) return;
 
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, streak')
         .eq('id', user.id)
         .single();
 
-      console.log('PROFILE:', profile);
-      console.log('ERROR:', error);
-      console.log('IS ADMIN:', profile?.role === 'admin');
-
       setIsAdmin(profile?.role === 'admin');
+      setStreak(profile?.streak ?? 0);
     };
 
     checkRole();
@@ -63,6 +62,7 @@ export function MobileNav() {
       <div className="bg-slate-950/80 backdrop-blur-xl border-t border-white/5 px-2 py-3 pb-8 flex justify-around items-center">
         {menuItems.map((item) => {
           const isActive = isItemActive(item.href, pathname);
+          const isSeq = item.isSequencia;
 
           return (
             <Link
@@ -71,13 +71,22 @@ export function MobileNav() {
               className="flex flex-col items-center gap-1.5 transition-all active:scale-90"
             >
               <div className={`relative p-2 rounded-2xl transition-all duration-300 ${
-                isActive
+                isActive && isSeq
+                  ? 'bg-[#4A2080] text-white shadow-[0_0_20px_rgba(74,32,128,0.5)]'
+                  : isActive
                   ? 'bg-brand-primary text-white shadow-[0_0_20px_rgba(255,107,0,0.4)]'
                   : 'text-slate-500 hover:text-slate-300'
               }`}>
                 <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
 
-                {isActive && (
+                {/* Badge de streak na aba Sequência */}
+                {isSeq && streak > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-[#4A2080] text-white text-[8px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 border border-slate-950 shadow">
+                    {streak}
+                  </span>
+                )}
+
+                {isActive && !isSeq && (
                   <span className="absolute -top-1 -right-1 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-primary opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-brand-primary" />
@@ -86,7 +95,11 @@ export function MobileNav() {
               </div>
 
               <span className={`text-[9px] font-black uppercase tracking-wider transition-colors duration-300 ${
-                isActive ? 'text-brand-primary' : 'text-slate-600'
+                isActive && isSeq
+                  ? 'text-[#7B4FBF]'
+                  : isActive
+                  ? 'text-brand-primary'
+                  : 'text-slate-600'
               }`}>
                 {item.label}
               </span>

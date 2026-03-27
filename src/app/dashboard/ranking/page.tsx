@@ -23,6 +23,7 @@ type CurrentUser = {
   full_name: string | null;
   xp: number;
   last_share_date: string | null;
+  organization_id: string | null; // NOVA MUDANÇA
 };
 
 type Level = {
@@ -48,7 +49,7 @@ function getLevel(xp: number): Level {
 }
 
 const SHARE_XP_BONUS = 20;
-const INSTAGRAM_URL  = 'https://www.instagram.com/tecnologge';
+const INSTAGRAM_URL  = 'https://www.instagram.com/tecnologgeaventureiro';
 
 // ============================================================
 // COMPONENTE
@@ -69,12 +70,15 @@ export default function RankingPage() {
   };
 
   // ----------------------------------------------------------
-  // FETCH RANKING
+  // FETCH RANKING (Agora recebe o ID da organização)
   // ----------------------------------------------------------
-  const fetchRanking = useCallback(async () => {
+  const fetchRanking = useCallback(async (orgId: string | null) => {
+    if (!orgId) return;
+
     const { data } = await supabase
       .from('profiles')
       .select('id, full_name, xp')
+      .eq('organization_id', orgId) // NOVA MUDANÇA: Filtra pela escola
       .order('xp', { ascending: false, nullsFirst: false })
       .limit(10);
 
@@ -94,20 +98,22 @@ export default function RankingPage() {
           return;
         }
 
-        const [, profileRes] = await Promise.all([
-          fetchRanking(),
-          supabase
-            .from('profiles')
-            .select('id, full_name, xp, last_share_date')
-            .eq('id', user.id)
-            .single(),
-        ]);
+        // 1. Busca primeiro o perfil para saber a escola
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, full_name, xp, last_share_date, organization_id')
+          .eq('id', user.id)
+          .single();
 
-        if (profileRes.data) {
-          const profile = profileRes.data as CurrentUser;
+        if (profileData) {
+          const profile = profileData as CurrentUser;
           setCurrentUser(profile);
+          
           const today = new Date().toISOString().split('T')[0];
           if (profile.last_share_date === today) setAlreadySharedToday(true);
+
+          // 2. Busca o ranking da escola específica deste aluno
+          await fetchRanking(profile.organization_id);
         }
       } finally {
         setLoading(false);
@@ -152,7 +158,7 @@ export default function RankingPage() {
       setCurrentUser({ ...currentUser, xp: novoXp });
       notify('success', `Incrível! +${SHARE_XP_BONUS} XP adicionados. Volte amanhã!`);
 
-      await fetchRanking();
+      await fetchRanking(currentUser.organization_id); // Passa o orgId para atualizar
       window.open(INSTAGRAM_URL, '_blank');
 
     } catch {
@@ -178,7 +184,6 @@ export default function RankingPage() {
   // ----------------------------------------------------------
   return (
     <div className="pb-8 px-4 pt-10 font-sans">
-
       {/* Toast */}
       {message && (
         <div className={`fixed top-5 left-4 right-4 md:left-auto md:right-5 md:max-w-sm z-50 p-4 rounded-2xl border shadow-2xl animate-in slide-in-from-top-4 duration-300 flex items-center gap-3 font-bold uppercase text-[10px] tracking-widest ${
@@ -205,64 +210,64 @@ export default function RankingPage() {
           Hall da <span className="text-brand-primary">Fama</span>
         </h1>
         <p className="text-slate-500 font-bold uppercase tracking-[0.3em] text-[10px] mt-2">
-          Os alunos mais brabos da Tecnologge
+           Os alunos mais brabos da Tecnologge ⚡
         </p>
       </div>
 
       {/* Lista do Ranking */}
       <div className="max-w-3xl mx-auto space-y-3">
-        {topUsers.map((user, index) => {
-          const isTop3 = index < 3;
-          const level  = getLevel(user.xp ?? 0);
-          const xp     = user.xp ?? 0;
+        {topUsers.length === 0 ? (
+           <p className="text-center text-slate-500 text-xs font-bold uppercase py-10">Ainda não há competidores nesta escola.</p>
+        ) : (
+          topUsers.map((user, index) => {
+            const isTop3 = index < 3;
+            const level  = getLevel(user.xp ?? 0);
+            const xp     = user.xp ?? 0;
 
-          return (
-            <motion.div
-              key={user.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-              className={`flex items-center gap-3 p-4 rounded-[2rem] border backdrop-blur-md ${
-                index === 0
-                  ? 'border-yellow-500/50 bg-yellow-500/10'
-                  : 'border-white/5 bg-slate-900/40'
-              }`}
-            >
-              {/* Posição — largura fixa */}
-              <div className="w-7 flex-shrink-0 flex items-center justify-center">
-                {index === 0
-                  ? <Crown className="text-yellow-500" size={22} />
-                  : <span className="text-slate-600 font-black italic text-sm">#{index + 1}</span>
-                }
-              </div>
+            return (
+              <motion.div
+                key={user.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                className={`flex items-center gap-3 p-4 rounded-[2rem] border backdrop-blur-md ${
+                  index === 0
+                    ? 'border-yellow-500/50 bg-yellow-500/10'
+                    : 'border-white/5 bg-slate-900/40'
+                }`}
+              >
+                <div className="w-7 flex-shrink-0 flex items-center justify-center">
+                  {index === 0
+                    ? <Crown className="text-yellow-500" size={22} />
+                    : <span className="text-slate-600 font-black italic text-sm">#{index + 1}</span>
+                  }
+                </div>
 
-              {/* Avatar — tamanho fixo */}
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 ${
-                isTop3 ? 'border-white/20 bg-white/10' : 'border-white/5 bg-slate-800'
-              }`}>
-                <User size={18} className="text-slate-400" />
-              </div>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center border flex-shrink-0 ${
+                  isTop3 ? 'border-white/20 bg-white/10' : 'border-white/5 bg-slate-800'
+                }`}>
+                  <User size={18} className="text-slate-400" />
+                </div>
 
-              {/* Nome + Nível — cresce e trunca */}
-              <div className="flex flex-col min-w-0 flex-1">
-                <h3 className="font-black text-sm italic uppercase text-white leading-tight truncate">
-                  {user.full_name ?? 'Anônimo'}
-                </h3>
-                <span className={`mt-1 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase italic w-fit max-w-full truncate ${level.bg} ${level.color}`}>
-                  {level.name}
-                </span>
-              </div>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <h3 className="font-black text-sm italic uppercase text-white leading-tight truncate">
+                    {user.full_name ?? 'Anônimo'}
+                  </h3>
+                  <span className={`mt-1 px-2 py-0.5 rounded-lg text-[8px] font-black uppercase italic w-fit max-w-full truncate ${level.bg} ${level.color}`}>
+                    {level.name}
+                  </span>
+                </div>
 
-              {/* XP — largura fixa, não empurra o nome */}
-              <div className="flex-shrink-0 text-right w-20">
-                <p className="text-base font-black italic text-white tracking-tighter leading-none">
-                  {xp.toLocaleString('pt-BR')}
-                </p>
-                <p className="text-[8px] font-black text-slate-500 uppercase mt-0.5">XP</p>
-              </div>
-            </motion.div>
-          );
-        })}
+                <div className="flex-shrink-0 text-right w-20">
+                  <p className="text-base font-black italic text-white tracking-tighter leading-none">
+                    {xp.toLocaleString('pt-BR')}
+                  </p>
+                  <p className="text-[8px] font-black text-slate-500 uppercase mt-0.5">XP</p>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
       </div>
 
       {/* Bônus Diário */}
@@ -300,12 +305,6 @@ export default function RankingPage() {
             </div>
           )}
         </button>
-
-        {alreadySharedToday && (
-          <p className="text-slate-600 text-[9px] font-bold uppercase tracking-widest">
-            Você pode ganhar mais XP amanhã!
-          </p>
-        )}
       </motion.div>
 
       {/* Dica */}
@@ -314,8 +313,7 @@ export default function RankingPage() {
           <TrendingUp className="text-white" size={24} />
         </div>
         <p className="text-slate-400 text-xs font-medium leading-relaxed">
-          O ranking é atualizado conforme você estuda. Cada aula concluída na{' '}
-          <span className="text-white font-bold">Tecnologge</span> te coloca mais perto do topo!
+          O ranking é atualizado conforme você estuda. Cada aula concluída te coloca mais perto do topo da sua escola!
         </p>
       </div>
     </div>

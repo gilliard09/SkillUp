@@ -30,6 +30,7 @@ function VipRegisterForm() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const courseId     = searchParams.get('courseId');
+  const orgId        = searchParams.get('orgId'); // NOVA MUDANÇA: Captura a escola
 
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -44,7 +45,7 @@ function VipRegisterForm() {
   const updateField = (field: keyof typeof formData) =>
     (e: React.ChangeEvent<HTMLInputElement>) => {
       setFormData(prev => ({ ...prev, [field]: e.target.value }));
-      setError(null); // Limpa erro ao redigitar
+      setError(null); 
     };
 
   // ----------------------------------------------------------
@@ -56,7 +57,9 @@ function VipRegisterForm() {
     if (formData.password.length < 6)
       return 'A senha deve ter no mínimo 6 caracteres.';
     if (!courseId)
-      return 'Link de convite inválido ou sem curso associado. Solicite um novo link.';
+      return 'Link de convite inválido ou sem curso associado.';
+    if (!orgId)
+      return 'Este link não possui um identificador de escola válido.'; // NOVA VALIDAÇÃO
     return null;
   };
 
@@ -84,25 +87,29 @@ function VipRegisterForm() {
       });
 
       if (authError) throw new Error(translateError(authError.message));
-      if (!authData.user) throw new Error('Erro ao criar usuário. Tente novamente.');
+      if (!authData.user) throw new Error('Erro ao criar usuário.');
 
       const userId = authData.user.id;
 
-      // 2. Cria perfil — com tratamento de erro explícito
+      // 2. Cria perfil — NOVA MUDANÇA: Agora inclui o organization_id
       const { error: profileError } = await supabase
         .from('profiles')
-        .upsert({ id: userId, full_name: formData.fullName, xp: 0 });
+        .upsert({ 
+          id: userId, 
+          full_name: formData.fullName, 
+          xp: 0,
+          organization_id: orgId // Vincula o aluno à escola automaticamente
+        });
 
-      if (profileError) throw new Error('Erro ao criar perfil. Contate o suporte.');
+      if (profileError) throw new Error('Erro ao criar perfil na escola.');
 
-      // 3. Matrícula no curso — courseId já validado acima
+      // 3. Matrícula no curso
       const { error: enrollError } = await supabase
         .from('enrollments')
         .insert({ user_id: userId, product_id: courseId });
 
-      if (enrollError) throw new Error('Erro ao matricular no curso. Contate o suporte.');
+      if (enrollError) throw new Error('Erro ao matricular no curso.');
 
-      // 4. Sucesso — mostra tela e redireciona
       setSuccess(true);
       setTimeout(() => router.push('/login'), 3000);
 
@@ -129,9 +136,9 @@ function VipRegisterForm() {
           </div>
           <h1 className="text-3xl font-black text-white uppercase italic">Acesso Liberado!</h1>
           <p className="text-slate-400 leading-relaxed">
-            Seu perfil foi criado e o curso já está na sua conta.
+            Seu perfil foi criado e você já está vinculado à escola.
             <br />
-            Redirecionando para o login...
+            Redirecionando...
           </p>
           <div className="flex justify-center">
             <Loader2 className="animate-spin text-brand-primary" size={24} />
@@ -142,9 +149,9 @@ function VipRegisterForm() {
   }
 
   // ----------------------------------------------------------
-  // AVISO DE LINK INVÁLIDO
+  // AVISO DE LINK INVÁLIDO (Course ou Org faltando)
   // ----------------------------------------------------------
-  if (!courseId) {
+  if (!courseId || !orgId) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
         <motion.div
@@ -155,10 +162,10 @@ function VipRegisterForm() {
           <div className="h-20 w-20 bg-red-500/10 border border-red-500/20 rounded-3xl flex items-center justify-center mx-auto">
             <AlertCircle size={40} className="text-red-500" />
           </div>
-          <h1 className="text-2xl font-black text-white uppercase italic">Link Inválido</h1>
+          <h1 className="text-2xl font-black text-white uppercase italic">Convite Incompleto</h1>
           <p className="text-slate-400 text-sm leading-relaxed">
-            Este link de convite não possui um curso associado.
-            Entre em contato com a escola para receber um novo link.
+            Este link de convite não possui todas as informações necessárias (Escola ou Curso).
+            Solicite um novo link VIP.
           </p>
           <Link
             href="/login"
@@ -171,18 +178,11 @@ function VipRegisterForm() {
     );
   }
 
-  // ----------------------------------------------------------
-  // RENDER — FORMULÁRIO
-  // ----------------------------------------------------------
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-
-      {/* Glow decorativo */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-brand-primary/10 via-transparent to-transparent -z-10 pointer-events-none" />
 
       <div className="w-full max-w-md">
-
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-primary/10 border border-brand-primary/20 mb-4">
             <Zap size={14} className="text-brand-primary fill-brand-primary" />
@@ -198,7 +198,6 @@ function VipRegisterForm() {
           </p>
         </div>
 
-        {/* Erro inline */}
         {error && (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
@@ -210,10 +209,7 @@ function VipRegisterForm() {
           </motion.div>
         )}
 
-        {/* Formulário */}
         <form onSubmit={handleRegister} className="space-y-4">
-
-          {/* Nome */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">
               Nome Completo
@@ -229,14 +225,11 @@ function VipRegisterForm() {
                 placeholder="Ex: Jeferson Silva"
                 value={formData.fullName}
                 onChange={updateField('fullName')}
-                autoComplete="name"
-                minLength={2}
                 className="w-full bg-slate-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-primary/50 transition-all"
               />
             </div>
           </div>
 
-          {/* E-mail */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">
               Seu Melhor E-mail
@@ -252,13 +245,11 @@ function VipRegisterForm() {
                 placeholder="seu@email.com"
                 value={formData.email}
                 onChange={updateField('email')}
-                autoComplete="email"
                 className="w-full bg-slate-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-primary/50 transition-all"
               />
             </div>
           </div>
 
-          {/* Senha */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">
               Crie uma Senha
@@ -274,8 +265,6 @@ function VipRegisterForm() {
                 placeholder="Mínimo 6 caracteres"
                 value={formData.password}
                 onChange={updateField('password')}
-                autoComplete="new-password"
-                minLength={6}
                 className="w-full bg-slate-900 border border-white/5 rounded-2xl py-4 pl-12 pr-4 text-white placeholder:text-slate-700 focus:outline-none focus:border-brand-primary/50 transition-all"
               />
             </div>
@@ -286,10 +275,7 @@ function VipRegisterForm() {
             disabled={loading}
             className="w-full h-16 bg-white text-slate-950 hover:bg-brand-primary hover:text-white font-black text-lg rounded-2xl transition-all shadow-xl active:scale-95 uppercase italic mt-2"
           >
-            {loading
-              ? <Loader2 className="animate-spin" size={22} />
-              : 'Finalizar Cadastro'
-            }
+            {loading ? <Loader2 className="animate-spin" size={22} /> : 'Finalizar Cadastro'}
           </Button>
         </form>
 
@@ -304,9 +290,6 @@ function VipRegisterForm() {
   );
 }
 
-// ============================================================
-// EXPORT — Suspense obrigatório para useSearchParams no App Router
-// ============================================================
 export default function VipRegisterPage() {
   return (
     <Suspense fallback={
