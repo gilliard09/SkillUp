@@ -89,6 +89,7 @@ function VipRegisterForm() {
       if (authError) throw new Error(translateError(authError.message));
       if (!authData.user) throw new Error('Erro ao criar usuário.');
 
+      
       const userId = authData.user.id;
 
       // 2. Cria perfil — NOVA MUDANÇA: Agora inclui o organization_id

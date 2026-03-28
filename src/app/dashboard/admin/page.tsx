@@ -4,12 +4,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   PlusCircle, Video, CheckCircle2,
   Trash2, Loader2, Book,
   Briefcase, Users, Trophy, BookOpen,
   UserPlus, ShieldCheck, AlertCircle, Eye, Copy, Pencil, X,
-  Settings, Lock, KeyRound, Sparkles,
+  Settings, Lock, KeyRound, Sparkles, Building2, Link, FileText,
 } from 'lucide-react';
 
 // ============================================================
@@ -68,6 +69,13 @@ type GeneratedQuestion = {
   points: number;
 };
 
+type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  created_at: string;
+};
+
 // ============================================================
 // ESTADO INICIAL DOS FORMULÁRIOS
 // ============================================================
@@ -76,6 +84,7 @@ const INITIAL_MODULE    = { title: '', course_id: '' };
 const INITIAL_LESSON    = { title: '', content: '', video_url: '', activity_pdf_url: '', module_id: '', order: 1 };
 const INITIAL_STUDENT   = { email: '', password: '', fullName: '', selectedCourse: '' };
 const INITIAL_CHALLENGE = { title: '', description: '', xp_reward: 50, category: 'Tecnologia', difficulty: 'Fácil' };
+const INITIAL_ORG       = { name: '', slug: '' };
 
 // ============================================================
 // MODAL GENÉRICO DE CONFIRMAÇÃO
@@ -191,6 +200,7 @@ export default function AdminPage() {
   const [lessons, setLessons]         = useState<Lesson[]>([]);
   const [challenges, setChallenges]   = useState<Challenge[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
 
   // Edição de curso
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
@@ -201,6 +211,7 @@ export default function AdminPage() {
   const [newLesson,    setNewLesson]    = useState(INITIAL_LESSON);
   const [studentForm,  setStudentForm]  = useState(INITIAL_STUDENT);
   const [newChallenge, setNewChallenge] = useState(INITIAL_CHALLENGE);
+  const [newOrg,       setNewOrg]       = useState(INITIAL_ORG);
 
   // MUDANÇA 2: estados para a aba de configurações
   const [currentPassword, setCurrentPassword] = useState('');
@@ -246,7 +257,7 @@ export default function AdminPage() {
   // ----------------------------------------------------------
   const loadData = useCallback(async () => {
     try {
-      const [courRes, modRes, lesRes, challRes, subRes] = await Promise.all([
+      const [courRes, modRes, lesRes, challRes, subRes, orgRes] = await Promise.all([
         supabase.from('courses').select('*').order('title'),
         supabase.from('modules').select('*, courses(title)').order('order_index'),
         supabase.from('lessons').select('*, modules(title)').order('created_at', { ascending: false }),
@@ -256,12 +267,14 @@ export default function AdminPage() {
           .select('*, challenges(title, xp_reward), profiles(full_name, xp)')
           .eq('status', 'pending')
           .order('created_at', { ascending: false }),
+        supabase.from('organizations').select('*').order('name'),
       ]);
 
       if (courRes.data)  setCourses(courRes.data);
       if (modRes.data)   setModules(modRes.data);
       if (lesRes.data)   setLessons(lesRes.data);
       if (challRes.data) setChallenges(challRes.data);
+      if (orgRes.data)   setOrganizations(orgRes.data);
 
       if (subRes.error) {
         const { data: basicSub } = await supabase
@@ -561,6 +574,34 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
+  // CRIAR ESCOLA
+  // ----------------------------------------------------------
+  const handleCreateOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('organizations').insert([newOrg]);
+      if (error) throw error;
+      notify('success', 'Escola criada!');
+      setNewOrg(INITIAL_ORG);
+      await loadData();
+    } catch (err: any) {
+      notify('error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ----------------------------------------------------------
+  // COPIAR LINK DE CONVITE
+  // ----------------------------------------------------------
+  const copyInviteLink = (courseId: string) => {
+    const link = `${window.location.origin}/register?course=${courseId}`;
+    navigator.clipboard.writeText(link);
+    notify('success', 'Link copiado!');
+  };
+
+  // ----------------------------------------------------------
   // QUIZ IA — gerar questões
   // ----------------------------------------------------------
   const handleGenerateQuiz = async () => {
@@ -748,14 +789,35 @@ export default function AdminPage() {
             </div>
 
             {courses.length > 0 && (
-              <div className="bg-slate-900/30 border border-white/5 p-6 rounded-[2rem] space-y-3">
-                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4">Cursos Cadastrados</h3>
+              <div className="space-y-4">
+                <h3 className="text-white font-black text-xs uppercase tracking-widest">Cursos Cadastrados</h3>
                 {courses.map(course => (
-                  <div key={course.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5">
-                    <span className="text-white text-sm font-bold truncate pr-4">{course.title}</span>
-                    <button onClick={() => { setEditingCourseId(course.id); setNewCourse({ title: course.title, category: course.category, description: course.description, image_url: course.image_url }); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="text-slate-500 hover:text-brand-primary transition-colors flex-shrink-0">
-                      <Pencil size={16} />
-                    </button>
+                  <div key={course.id} className="bg-slate-900/30 border border-white/5 p-4 rounded-[2rem] space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-white text-sm font-bold truncate pr-4">{course.title}</span>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <button
+                          onClick={() => copyInviteLink(course.id)}
+                          className="p-2 bg-white/5 rounded-lg text-slate-400 hover:text-brand-primary transition-colors"
+                          title="Copiar link de convite"
+                        >
+                          <Link size={14} />
+                        </button>
+                        <button
+                          onClick={() => { setEditingCourseId(course.id); setNewCourse({ title: course.title, category: course.category, description: course.description, image_url: course.image_url }); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className="p-2 bg-white/5 rounded-lg text-slate-400 hover:text-amber-500 transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center p-4 bg-white rounded-2xl">
+                      <QRCodeSVG
+                        value={`${typeof window !== 'undefined' ? window.location.origin : ''}/register?course=${course.id}`}
+                        size={100}
+                      />
+                      <p className="text-[9px] text-slate-900 font-black mt-2 uppercase tracking-widest">Convite via QR</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -786,7 +848,7 @@ export default function AdminPage() {
               <form onSubmit={handleSaveLesson} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <select required value={newLesson.module_id} onChange={e => setNewLesson({ ...newLesson, module_id: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white">
                   <option value="">Módulo...</option>
-                  {modules.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+                  {modules.map(m => <option key={m.id} value={m.id}>{m.title} {m.courses?.title ? `(${m.courses.title})` : ''}</option>)}
                 </select>
                 <input required value={newLesson.title} onChange={e => setNewLesson({ ...newLesson, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Título da Aula" />
                 <input value={newLesson.video_url} onChange={e => setNewLesson({ ...newLesson, video_url: e.target.value })} className="md:col-span-2 w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="URL do Vídeo (YouTube)" />
@@ -805,10 +867,13 @@ export default function AdminPage() {
               <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                 {lessons.length === 0 && <p className="text-slate-600 text-sm font-bold uppercase text-center py-8">Nenhuma aula cadastrada.</p>}
                 {lessons.map(lesson => (
-                  <div key={lesson.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-all">
+                  <div key={lesson.id} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:border-white/10 transition-all group">
                     <div>
                       <p className="text-white font-bold text-sm">{lesson.title}</p>
-                      <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">{lesson.modules?.title || 'Sem módulo'}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">{lesson.modules?.title || 'Sem módulo'}</p>
+                        {lesson.activity_pdf_url && <FileText size={11} className="text-emerald-500 flex-shrink-0" title="Tem PDF" />}
+                      </div>
                     </div>
                     <Button onClick={() => setDuplicateTarget(lesson)} variant="outline" className="h-9 gap-2 border-brand-secondary/50 text-brand-secondary hover:bg-brand-secondary hover:text-white flex-shrink-0">
                       <Copy size={14} /> Duplicar
@@ -942,10 +1007,67 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: CONFIGURAÇÕES — nova aba
+          ABA: CONFIGURAÇÕES
       ====================================================== */}
       {activeTab === 'settings' && (
-        <div className="max-w-lg mx-auto animate-in fade-in duration-500">
+        <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+
+          {/* Escolas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-slate-900/50 border border-brand-primary/20 p-8 rounded-[2.5rem]">
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <Building2 className="text-brand-primary" size={24} /> Registrar Escola
+              </h2>
+              <form onSubmit={handleCreateOrg} className="space-y-4">
+                <input
+                  required
+                  value={newOrg.name}
+                  onChange={e => setNewOrg({ ...newOrg, name: e.target.value, slug: e.target.value.toLowerCase().replace(/ /g, '-') })}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white"
+                  placeholder="Nome da Escola"
+                />
+                <input
+                  required
+                  value={newOrg.slug}
+                  onChange={e => setNewOrg({ ...newOrg, slug: e.target.value })}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white font-mono text-sm"
+                  placeholder="slug-da-escola"
+                />
+                <Button
+                  disabled={loading}
+                  className="w-full bg-brand-primary text-white font-black h-14 rounded-2xl uppercase italic"
+                >
+                  {loading ? <Loader2 className="animate-spin" size={18} /> : 'Criar Escola'}
+                </Button>
+              </form>
+            </div>
+
+            <div className="bg-slate-900/30 border border-white/5 p-8 rounded-[2.5rem]">
+              <h2 className="text-xl font-bold text-white mb-6">Escolas Ativas</h2>
+              {organizations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-slate-600 gap-3">
+                  <Building2 size={32} />
+                  <p className="text-xs font-black uppercase tracking-widest">Nenhuma escola cadastrada</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[250px] overflow-y-auto pr-2">
+                  {organizations.map(org => (
+                    <div key={org.id} className="p-4 bg-white/5 border border-white/5 rounded-2xl flex items-center justify-between">
+                      <div>
+                        <p className="text-white font-bold text-sm">{org.name}</p>
+                        <p className="text-slate-500 text-[9px] uppercase font-bold tracking-widest font-mono">{org.slug}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-brand-primary/10 rounded-lg flex items-center justify-center text-brand-primary flex-shrink-0">
+                        <CheckCircle2 size={14} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Senha de validação */}
           <div className="bg-slate-900/50 border border-white/5 p-10 rounded-[2.5rem] space-y-8">
 
             <div className="flex items-center gap-4">
