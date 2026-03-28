@@ -872,7 +872,11 @@ export default function AdminPage() {
                       <p className="text-white font-bold text-sm">{lesson.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">{lesson.modules?.title || 'Sem módulo'}</p>
-                        {lesson.activity_pdf_url && <FileText size={11} className="text-emerald-500 flex-shrink-0" title="Tem PDF" />}
+                        {lesson.activity_pdf_url && (
+  <span title="Tem PDF">
+    <FileText size={11} className="text-emerald-500 flex-shrink-0" />
+  </span>
+)}
                       </div>
                     </div>
                     <Button onClick={() => setDuplicateTarget(lesson)} variant="outline" className="h-9 gap-2 border-brand-secondary/50 text-brand-secondary hover:bg-brand-secondary hover:text-white flex-shrink-0">
