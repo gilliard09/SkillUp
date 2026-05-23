@@ -33,7 +33,7 @@ type Profile = {
   id: string;
   full_name: string | null;
   xp: number;
-  created_at: string | null;
+  updated_at: string | null;
 };
 
 type Stats = {
@@ -335,8 +335,8 @@ export default function ProfilePage() {
               <span className="flex items-center gap-2 text-slate-400 text-xs font-medium">
                 <Calendar size={14} className="text-brand-primary" />
                 Membro desde{' '}
-                {profile?.created_at
-                  ? new Date(profile.created_at).getFullYear()
+                {profile?.updated_at
+                  ? new Date(profile.updated_at).getFullYear()
                   : '---'}
               </span>
             </div>

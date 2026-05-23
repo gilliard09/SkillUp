@@ -10,7 +10,8 @@ import {
   Trash2, Loader2, Book,
   Briefcase, Users, Trophy, BookOpen,
   UserPlus, ShieldCheck, AlertCircle, Eye, Copy, Pencil, X,
-  Settings, Lock, KeyRound, Sparkles, Building2, Link, FileText,
+  Settings, Lock, KeyRound, Building2, Link, FileText,
+  BarChart3, Calendar, GraduationCap,
 } from 'lucide-react';
 
 // ============================================================
@@ -61,19 +62,19 @@ type Submission = {
   profiles?: { full_name: string; xp: number };
 };
 
-type GeneratedQuestion = {
-  question_text: string;
-  type: 'multiple_choice' | 'true_false';
-  options: string[];
-  correct_option_index: number;
-  points: number;
-};
-
 type Organization = {
   id: string;
   name: string;
   slug: string;
-  created_at: string;
+  updated_at: string;
+};
+
+type StudentData = {
+  id: string;
+  full_name: string;
+  email: string;
+  updated_at: string;
+  courses?: { title: string }[];
 };
 
 // ============================================================
@@ -83,7 +84,7 @@ const INITIAL_COURSE    = { title: '', category: 'Tecnologia', description: '', 
 const INITIAL_MODULE    = { title: '', course_id: '' };
 const INITIAL_LESSON    = { title: '', content: '', video_url: '', activity_pdf_url: '', module_id: '', order: 1 };
 const INITIAL_STUDENT   = { email: '', password: '', fullName: '', selectedCourse: '' };
-const INITIAL_CHALLENGE = { title: '', description: '', xp_reward: 50, category: 'Tecnologia', difficulty: 'Fácil' };
+const INITIAL_CHALLENGE = { title: '', description: '', xp_reward: 100, category: 'Tecnologia', difficulty: 'Fácil' };
 const INITIAL_ORG       = { name: '', slug: '' };
 
 // ============================================================
@@ -114,7 +115,7 @@ function ConfirmModal({
           </button>
         </div>
         <div>
-          <h3 className="text-white font-black text-xl uppercase mb-2">{title}</h3>
+          <h3 className="text-white font-black text-xl uppercase">{title}</h3>
           <p className="text-slate-400 text-sm">{description}</p>
         </div>
         <div className="flex gap-4">
@@ -185,47 +186,43 @@ function DuplicateLessonModal({
 export default function AdminPage() {
   const router = useRouter();
 
-  const [activeTab, setActiveTab]       = useState<'content' | 'students' | 'challenges' | 'approvals' | 'settings' | 'quiz'>('content');
-  const [loading, setLoading]           = useState(false);
-  const [deletingId, setDeletingId]     = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'content' | 'students' | 'challenges' | 'approvals' | 'settings' | 'data'>('content');
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState(true);
-  const [approvingId, setApprovingId]   = useState<string | null>(null);
-  const [message, setMessage]           = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [duplicateTarget, setDuplicateTarget]     = useState<Lesson | null>(null);
-  const [deleteTarget, setDeleteTarget]           = useState<Challenge | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [duplicateTarget, setDuplicateTarget] = useState<Lesson | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Challenge | null>(null);
+  const [adminOrgId, setAdminOrgId] = useState<string | null>(null);
 
   // Dados
-  const [courses, setCourses]         = useState<Course[]>([]);
-  const [modules, setModules]         = useState<Module[]>([]);
-  const [lessons, setLessons]         = useState<Lesson[]>([]);
-  const [challenges, setChallenges]   = useState<Challenge[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [studentsData, setStudentsData] = useState<StudentData[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);
 
   // Edição de curso
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null);
 
   // Formulários
-  const [newCourse,    setNewCourse]    = useState(INITIAL_COURSE);
-  const [newModule,    setNewModule]    = useState(INITIAL_MODULE);
-  const [newLesson,    setNewLesson]    = useState(INITIAL_LESSON);
-  const [studentForm,  setStudentForm]  = useState(INITIAL_STUDENT);
+  const [newCourse, setNewCourse] = useState(INITIAL_COURSE);
+  const [newModule, setNewModule] = useState(INITIAL_MODULE);
+  const [newLesson, setNewLesson] = useState(INITIAL_LESSON);
+  const [studentForm, setStudentForm] = useState(INITIAL_STUDENT);
   const [newChallenge, setNewChallenge] = useState(INITIAL_CHALLENGE);
-  const [newOrg,       setNewOrg]       = useState(INITIAL_ORG);
+  const [newOrg, setNewOrg] = useState(INITIAL_ORG);
 
-  // MUDANÇA 2: estados para a aba de configurações
+  // Estados para a aba de configurações
   const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword,     setNewPassword]     = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loadingPassword, setLoadingPassword] = useState(false);
-  const [showPasswords,   setShowPasswords]   = useState(false);
-
-  // Quiz IA
-  const [quizLesson,        setQuizLesson]        = useState('');
-  const [generatedQs,       setGeneratedQs]       = useState<GeneratedQuestion[]>([]);
-  const [generatingQuiz,    setGeneratingQuiz]    = useState(false);
-  const [savingQuiz,        setSavingQuiz]        = useState(false);
-  const [quizQuestionCount, setQuizQuestionCount] = useState(5);
+  const [showPasswords, setShowPasswords] = useState(false);
 
   // ----------------------------------------------------------
   // NOTIFICAÇÃO
@@ -241,12 +238,23 @@ export default function AdminPage() {
   useEffect(() => {
     const checkAdmin = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
+      if (!user) { 
+        router.push('/login'); 
+        return; 
+      }
 
       const { data: profile } = await supabase
-        .from('profiles').select('role').eq('id', user.id).single();
+        .from('profiles')
+        .select('role, organization_id')
+        .eq('id', user.id)
+        .single();
 
-      if (profile?.role !== 'admin') { router.push('/dashboard'); return; }
+      if (profile?.role !== 'admin') { 
+        router.push('/dashboard'); 
+        return; 
+      }
+      
+      setAdminOrgId(profile.organization_id);
       setAuthChecking(false);
     };
     checkAdmin();
@@ -270,20 +278,24 @@ export default function AdminPage() {
         supabase.from('organizations').select('*').order('name'),
       ]);
 
-      if (courRes.data)  setCourses(courRes.data);
-      if (modRes.data)   setModules(modRes.data);
-      if (lesRes.data)   setLessons(lesRes.data);
+      if (courRes.data) setCourses(courRes.data);
+      if (modRes.data) setModules(modRes.data);
+      if (lesRes.data) setLessons(lesRes.data);
       if (challRes.data) setChallenges(challRes.data);
-      if (orgRes.data)   setOrganizations(orgRes.data);
+      if (orgRes.data) setOrganizations(orgRes.data);
 
       if (subRes.error) {
+        console.error('Erro ao carregar submissões:', subRes.error);
         const { data: basicSub } = await supabase
-          .from('challenge_submissions').select('*').eq('status', 'pending');
+          .from('challenge_submissions')
+          .select('*')
+          .eq('status', 'pending');
         if (basicSub) setSubmissions(basicSub);
       } else {
         if (subRes.data) setSubmissions(subRes.data);
       }
-    } catch {
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
       notify('error', 'Erro ao carregar dados.');
     }
   }, []);
@@ -292,7 +304,81 @@ export default function AdminPage() {
     if (!authChecking) loadData();
   }, [authChecking, loadData]);
 
-  // MUDANÇA 3: carrega senha atual ao entrar na aba settings
+  // ----------------------------------------------------------
+  // CARREGAR DADOS DOS ALUNOS
+  // ----------------------------------------------------------
+  const loadStudentsData = useCallback(async () => {
+    if (!adminOrgId) return;
+
+    try {
+      setLoading(true);
+
+      // 1. Busca todos os alunos
+      const { data: profiles, error: profilesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, updated_at')
+        .eq('organization_id', adminOrgId)
+        .eq('role', 'student')
+        .order('updated_at', { ascending: false });
+
+      if (profilesError) throw profilesError;
+
+      if (profiles && profiles.length > 0) {
+        setTotalStudents(profiles.length);
+        const profileIds = profiles.map(p => p.id);
+
+        // 2. Busca TODAS as matrículas desses alunos
+        const { data: allEnrollments, error: enrollmentsError } = await supabase
+          .from('enrollments')
+          .select('user_id, product_id')
+          .in('user_id', profileIds);
+
+        if (enrollmentsError) throw enrollmentsError;
+
+        // 3. Busca TODOS os cursos
+        const { data: allCourses, error: coursesError } = await supabase
+          .from('courses')
+          .select('id, title');
+
+        if (coursesError) throw coursesError;
+
+        // 4. Junta tudo na memória
+        const studentsWithCourses = profiles.map((profile) => {
+          const userEnrollments = allEnrollments?.filter(e => e.user_id === profile.id) || [];
+          
+          const userCourses = userEnrollments.map((enrollment) => {
+            const foundCourse = allCourses?.find(course => course.id === enrollment.product_id);
+            return foundCourse ? { title: foundCourse.title } : null;
+          }).filter(Boolean);
+
+          return {
+            ...profile,
+            courses: userCourses,
+          };
+        });
+
+        setStudentsData(studentsWithCourses as unknown as StudentData[]);
+      } else {
+        setTotalStudents(0);
+        setStudentsData([]);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados dos alunos:', err);
+      notify('error', 'Erro ao carregar dados dos alunos.');
+    } finally {
+      setLoading(false);
+    }
+  }, [adminOrgId]);
+
+  useEffect(() => {
+    if (activeTab === 'data' && adminOrgId) {
+      loadStudentsData();
+    }
+  }, [activeTab, adminOrgId, loadStudentsData]);
+
+  // ----------------------------------------------------------
+  // CARREGA SENHA ATUAL
+  // ----------------------------------------------------------
   const loadCurrentPassword = useCallback(async () => {
     const { data } = await supabase
       .from('settings')
@@ -306,7 +392,9 @@ export default function AdminPage() {
     if (activeTab === 'settings') loadCurrentPassword();
   }, [activeTab, loadCurrentPassword]);
 
-  // MUDANÇA 4: handler para trocar a senha
+  // ----------------------------------------------------------
+  // TROCAR SENHA
+  // ----------------------------------------------------------
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -366,26 +454,64 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // APROVAR SUBMISSÃO
+  // APROVAR SUBMISSÃO (CORRIGIDO)
   // ----------------------------------------------------------
   const handleApproveSubmission = async (submission: Submission) => {
     setApprovingId(submission.id);
     try {
-      const { error: subError } = await supabase
-        .from('challenge_submissions').update({ status: 'approved' }).eq('id', submission.id);
-      if (subError) throw subError;
+      // 1. Busca o XP atual do usuário ANTES de qualquer alteração
+      const { data: profileData, error: fetchError } = await supabase
+        .from('profiles')
+        .select('xp')
+        .eq('id', submission.user_id)
+        .single();
 
-      const xpGanho  = Number(submission.challenges?.xp_reward) || 0;
-      const xpAtual  = Number(submission.profiles?.xp) || 0;
+      if (fetchError) {
+        console.error('Erro ao buscar perfil:', fetchError);
+        throw fetchError;
+      }
 
-      const { error: profileError } = await supabase
-        .from('profiles').update({ xp: xpAtual + xpGanho }).eq('id', submission.user_id);
-      if (profileError) throw profileError;
+      // 2. Calcula o novo XP (100 XP por desafio aprovado)
+      const xpGanho = 100;
+      const xpAtual = Number(profileData?.xp) || 0;
+      const novoXP = xpAtual + xpGanho;
 
-      notify('success', `Aprovado! +${xpGanho} XP enviado.`);
+      // 3. Atualiza o XP do usuário E o status da submissão em PARALELO
+      const [updateProfileResult, updateSubmissionResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .update({ xp: novoXP })
+          .eq('id', submission.user_id),
+        supabase
+          .from('challenge_submissions')
+          .update({ status: 'approved' })
+          .eq('id', submission.id)
+      ]);
+
+      if (updateProfileResult.error) {
+        console.error('Erro ao atualizar XP:', updateProfileResult.error);
+        throw updateProfileResult.error;
+      }
+
+      if (updateSubmissionResult.error) {
+        console.error('Erro ao atualizar submissão:', updateSubmissionResult.error);
+        throw updateSubmissionResult.error;
+      }
+
+      // 4. Remove imediatamente da lista local (UX instantânea)
+      setSubmissions(prev => prev.filter(s => s.id !== submission.id));
+
+      // 5. Mostra sucesso
+      notify('success', `Aprovado! +${xpGanho} XP concedido ao aluno.`);
+
+      // 6. Recarrega dados completos em background
       await loadData();
-    } catch {
-      notify('error', 'Erro na aprovação.');
+
+    } catch (err: any) {
+      console.error('Erro na aprovação:', err);
+      notify('error', 'Erro ao aprovar submissão: ' + err.message);
+      // Em caso de erro, recarrega para garantir estado consistente
+      await loadData();
     } finally {
       setApprovingId(null);
     }
@@ -398,10 +524,10 @@ export default function AdminPage() {
     e.preventDefault();
     setLoading(true);
     const payload = {
-      title:       newCourse.title,
-      category:    newCourse.category,
+      title: newCourse.title,
+      category: newCourse.category,
       description: newCourse.description || '',
-      image_url:   newCourse.image_url || '',
+      image_url: newCourse.image_url || '',
     };
     try {
       const { error } = editingCourseId
@@ -437,8 +563,8 @@ export default function AdminPage() {
       const nextOrder = (maxOrder?.order_index ?? 0) + 1;
 
       const { error } = await supabase.from('modules').insert([{
-        title:       newModule.title,
-        course_id:   newModule.course_id,
+        title: newModule.title,
+        course_id: newModule.course_id,
         order_index: nextOrder,
       }]);
       if (error) throw error;
@@ -470,12 +596,12 @@ export default function AdminPage() {
       const nextOrder = (maxOrder?.order_index ?? 0) + 1;
 
       const { error } = await supabase.from('lessons').insert([{
-        title:            newLesson.title,
-        content:          newLesson.content,
-        video_url:        newLesson.video_url,
+        title: newLesson.title,
+        content: newLesson.content,
+        video_url: newLesson.video_url,
         activity_pdf_url: newLesson.activity_pdf_url,
-        module_id:        newLesson.module_id,
-        order_index:      nextOrder,
+        module_id: newLesson.module_id,
+        order_index: nextOrder,
       }]);
       if (error) throw error;
       notify('success', 'Aula publicada!');
@@ -511,7 +637,7 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // CRIAR ALUNO — via Edge Function
+  // CRIAR ALUNO (CORRIGIDO)
   // ----------------------------------------------------------
   const handleCreateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -521,9 +647,20 @@ export default function AdminPage() {
       return;
     }
 
+    if (!adminOrgId) {
+      notify('error', 'Organização não identificada.');
+      return;
+    }
+
     setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        notify('error', 'Sessão não encontrada. Faça login novamente.');
+        setLoading(false);
+        return;
+      }
 
       const res = await fetch(
         `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/create-user`,
@@ -531,24 +668,33 @@ export default function AdminPage() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`,
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            email:    studentForm.email,
+            email: studentForm.email,
             password: studentForm.password,
             fullName: studentForm.fullName,
             courseId: studentForm.selectedCourse,
+            organizationId: adminOrgId,
           }),
         }
       );
 
       const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Erro desconhecido');
+      
+      if (!res.ok) {
+        throw new Error(result.error || 'Erro ao criar aluno');
+      }
 
-      notify('success', 'Aluno matriculado com sucesso!');
-      setStudentForm(INITIAL_STUDENT);
+      if (result.alreadyEnrolled) {
+        notify('error', 'Aluno já está matriculado neste curso.');
+      } else {
+        notify('success', result.message || 'Aluno matriculado com sucesso!');
+        setStudentForm(INITIAL_STUDENT);
+      }
     } catch (err: any) {
-      notify('error', err.message);
+      console.error('Erro ao criar aluno:', err);
+      notify('error', err.message || 'Erro ao criar aluno');
     } finally {
       setLoading(false);
     }
@@ -602,81 +748,15 @@ export default function AdminPage() {
   };
 
   // ----------------------------------------------------------
-  // QUIZ IA — gerar questões
+  // FORMATAR DATA
   // ----------------------------------------------------------
-  const handleGenerateQuiz = async () => {
-    if (!quizLesson) { notify('error', 'Selecione uma aula.'); return; }
-    setGeneratingQuiz(true);
-    setGeneratedQs([]);
-    try {
-      const lesson = lessons.find(l => l.id === quizLesson);
-      const res = await fetch('/api/generate-quiz', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lessonTitle:   lesson?.title ?? '',
-          lessonContent: lesson?.content ?? '',
-          questionCount: quizQuestionCount,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setGeneratedQs(data.questions);
-      notify('success', `${data.questions.length} questões geradas!`);
-    } catch (err: any) {
-      notify('error', 'Erro ao gerar: ' + err.message);
-    } finally {
-      setGeneratingQuiz(false);
-    }
-  };
-
-  const handleSaveQuiz = async () => {
-    if (!quizLesson || generatedQs.length === 0) return;
-    setSavingQuiz(true);
-    try {
-      const { data: existingQuiz } = await supabase
-        .from('quizzes').select('id').eq('lesson_id', quizLesson).maybeSingle();
-
-      let quizId = existingQuiz?.id;
-
-      if (!quizId) {
-        const lesson = lessons.find(l => l.id === quizLesson);
-        const { data: newQuiz, error } = await supabase
-          .from('quizzes')
-          .insert([{ lesson_id: quizLesson, title: `Quiz — ${lesson?.title ?? ''}` }])
-          .select('id').single();
-        if (error) throw error;
-        quizId = newQuiz.id;
-      }
-
-      const { error: qError } = await supabase.from('questions').insert(
-        generatedQs.map(q => ({
-          quiz_id:              quizId,
-          question_text:        q.question_text,
-          type:                 q.type,
-          options:              q.options,
-          correct_option_index: q.correct_option_index,
-          points:               q.points,
-        }))
-      );
-      if (qError) throw qError;
-
-      notify('success', 'Quiz salvo com sucesso!');
-      setGeneratedQs([]);
-      setQuizLesson('');
-    } catch (err: any) {
-      notify('error', 'Erro ao salvar: ' + err.message);
-    } finally {
-      setSavingQuiz(false);
-    }
-  };
-
-  const updateQuestion = (index: number, field: keyof GeneratedQuestion, value: any) => {
-    setGeneratedQs(prev => prev.map((q, i) => i === index ? { ...q, [field]: value } : q));
-  };
-
-  const removeQuestion = (index: number) => {
-    setGeneratedQs(prev => prev.filter((_, i) => i !== index));
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
   };
 
   // ----------------------------------------------------------
@@ -733,15 +813,14 @@ export default function AdminPage() {
           <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Gestão de Alunos e Conteúdo</p>
         </div>
 
-        {/* MUDANÇA 5: nova aba Config adicionada ao array de tabs */}
         <div className="flex bg-slate-900/80 p-1 rounded-2xl border border-white/5 shadow-2xl overflow-x-auto">
           {([
             { key: 'content',    label: 'Conteúdo',   icon: <BookOpen size={16} /> },
-            { key: 'students',   label: 'Alunos',      icon: <Users size={16} /> },
-            { key: 'challenges', label: 'Desafios',    icon: <Trophy size={16} /> },
-            { key: 'approvals',  label: 'Aprovações',  icon: <ShieldCheck size={16} /> },
-            { key: 'quiz',       label: 'Quiz IA',     icon: <Sparkles size={16} /> },
-            { key: 'settings',   label: 'Config',      icon: <Settings size={16} /> },
+            { key: 'students',   label: 'Alunos',     icon: <Users size={16} /> },
+            { key: 'challenges', label: 'Desafios',   icon: <Trophy size={16} /> },
+            { key: 'approvals',  label: 'Aprovações', icon: <ShieldCheck size={16} /> },
+            { key: 'data',       label: 'Dados',      icon: <BarChart3 size={16} /> },
+            { key: 'settings',   label: 'Config',     icon: <Settings size={16} /> },
           ] as const).map(tab => (
             <button
               key={tab.key}
@@ -757,7 +836,7 @@ export default function AdminPage() {
       </header>
 
       {/* ======================================================
-          ABA: CONTEÚDO — sem alterações
+          ABA: CONTEÚDO
       ====================================================== */}
       {activeTab === 'content' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
@@ -873,10 +952,10 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2 mt-0.5">
                         <p className="text-slate-500 text-[10px] uppercase font-bold tracking-widest">{lesson.modules?.title || 'Sem módulo'}</p>
                         {lesson.activity_pdf_url && (
-  <span title="Tem PDF">
-    <FileText size={11} className="text-emerald-500 flex-shrink-0" />
-  </span>
-)}
+                          <span title="Tem PDF">
+                            <FileText size={11} className="text-emerald-500 flex-shrink-0" />
+                          </span>
+                        )}
                       </div>
                     </div>
                     <Button onClick={() => setDuplicateTarget(lesson)} variant="outline" className="h-9 gap-2 border-brand-secondary/50 text-brand-secondary hover:bg-brand-secondary hover:text-white flex-shrink-0">
@@ -891,7 +970,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: ALUNOS — sem alterações
+          ABA: ALUNOS
       ====================================================== */}
       {activeTab === 'students' && (
         <div className="max-w-3xl mx-auto animate-in fade-in duration-500">
@@ -921,7 +1000,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: DESAFIOS — sem alterações
+          ABA: DESAFIOS
       ====================================================== */}
       {activeTab === 'challenges' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-500">
@@ -934,12 +1013,18 @@ export default function AdminPage() {
                 <input required value={newChallenge.title} onChange={e => setNewChallenge({ ...newChallenge, title: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="Título" />
                 <textarea required value={newChallenge.description} onChange={e => setNewChallenge({ ...newChallenge, description: e.target.value })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white h-32" placeholder="Descrição" />
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="number" min={1} value={newChallenge.xp_reward} onChange={e => setNewChallenge({ ...newChallenge, xp_reward: parseInt(e.target.value) || 0 })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="XP" />
-                  <select value={newChallenge.difficulty} onChange={e => setNewChallenge({ ...newChallenge, difficulty: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white">
-                    <option value="Fácil">Fácil</option>
-                    <option value="Médio">Médio</option>
-                    <option value="Difícil">Difícil</option>
-                  </select>
+                  <div>
+                    <label className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2 block">XP Recompensa</label>
+                    <input type="number" min={1} value={newChallenge.xp_reward} onChange={e => setNewChallenge({ ...newChallenge, xp_reward: parseInt(e.target.value) || 100 })} className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white" placeholder="100" />
+                  </div>
+                  <div>
+                    <label className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-2 block">Dificuldade</label>
+                    <select value={newChallenge.difficulty} onChange={e => setNewChallenge({ ...newChallenge, difficulty: e.target.value })} className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white">
+                      <option value="Fácil">Fácil</option>
+                      <option value="Médio">Médio</option>
+                      <option value="Difícil">Difícil</option>
+                    </select>
+                  </div>
                 </div>
                 <Button disabled={loading} className="w-full h-14 bg-brand-primary text-white font-black rounded-2xl">
                   {loading ? <Loader2 className="animate-spin" size={16} /> : 'Criar Desafio'}
@@ -968,7 +1053,7 @@ export default function AdminPage() {
       )}
 
       {/* ======================================================
-          ABA: APROVAÇÕES — sem alterações
+          ABA: APROVAÇÕES
       ====================================================== */}
       {activeTab === 'approvals' && (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -994,7 +1079,7 @@ export default function AdminPage() {
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold text-white uppercase italic">{sub.profiles?.full_name}</h3>
                   <p className="text-slate-500 text-xs font-medium">Desafio: {sub.challenges?.title}</p>
-                  <span className="text-brand-primary text-xs font-black">+{sub.challenges?.xp_reward} XP</span>
+                  <span className="text-brand-primary text-xs font-black">+100 XP (ao aprovar)</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <a href={sub.solution_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 bg-white/5 text-white px-6 py-4 rounded-2xl text-xs font-black border border-white/5 hover:bg-white/10 transition-all">
@@ -1006,6 +1091,143 @@ export default function AdminPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================
+          ABA: DADOS (NOVA)
+      ====================================================== */}
+      {activeTab === 'data' && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          
+          {/* Header com estatísticas */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-brand-primary/20 to-brand-primary/5 border border-brand-primary/30 p-8 rounded-[2rem]">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 bg-brand-primary/20 rounded-2xl flex items-center justify-center">
+                  <Users className="text-brand-primary" size={28} />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Total de Alunos</p>
+                  <h3 className="text-4xl font-black text-white mt-1">{totalStudents}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border border-emerald-500/30 p-8 rounded-[2rem]">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 bg-emerald-500/20 rounded-2xl flex items-center justify-center">
+                  <BookOpen className="text-emerald-500" size={28} />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Cursos Ativos</p>
+                  <h3 className="text-4xl font-black text-white mt-1">{courses.length}</h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-amber-500/20 to-amber-500/5 border border-amber-500/30 p-8 rounded-[2rem]">
+              <div className="flex items-center gap-4">
+                <div className="h-14 w-14 bg-amber-500/20 rounded-2xl flex items-center justify-center">
+                  <Trophy className="text-amber-500" size={28} />
+                </div>
+                <div>
+                  <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Desafios</p>
+                  <h3 className="text-4xl font-black text-white mt-1">{challenges.length}</h3>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabela de alunos */}
+          <div className="bg-slate-900/50 border border-white/5 p-8 rounded-[2.5rem]">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black text-white uppercase italic flex items-center gap-3">
+                <GraduationCap className="text-brand-primary" size={32} />
+                Lista de Alunos
+              </h2>
+              <Button 
+                onClick={loadStudentsData}
+                disabled={loading}
+                variant="outline"
+                className="border-white/10 text-slate-400 hover:text-white"
+              >
+                {loading ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
+                Atualizar
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="animate-spin text-brand-primary" size={40} />
+              </div>
+            ) : studentsData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-slate-600 gap-4">
+                <Users size={48} />
+                <p className="font-black uppercase text-sm tracking-widest">Nenhum aluno matriculado ainda</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-white/5">
+                      <th className="text-left py-4 px-4 text-slate-500 text-xs font-black uppercase tracking-widest">
+                        Nome
+                      </th>
+                      <th className="text-left py-4 px-4 text-slate-500 text-xs font-black uppercase tracking-widest">
+                        E-mail
+                      </th>
+                      <th className="text-left py-4 px-4 text-slate-500 text-xs font-black uppercase tracking-widest">
+                        Curso(s)
+                      </th>
+                      <th className="text-left py-4 px-4 text-slate-500 text-xs font-black uppercase tracking-widest">
+                        Data de Cadastro
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentsData.map((student) => (
+                      <tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-brand-primary/20 flex items-center justify-center text-brand-primary font-black text-sm">
+                              {student.full_name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="text-white font-bold text-sm">{student.full_name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span className="text-slate-400 text-sm font-mono">{student.email}</span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {student.courses && student.courses.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {student.courses.map((course, idx) => (
+                                <span
+                                  key={idx}
+                                  className="bg-brand-primary/10 text-brand-primary px-3 py-1 rounded-full text-xs font-bold"
+                                >
+                                  {course.title}
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-slate-600 text-xs italic">Sem curso</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-4">
+                          <div className="flex items-center gap-2 text-slate-400 text-sm">
+                            <Calendar size={14} />
+                            {formatDate(student.updated_at)}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1151,187 +1373,6 @@ export default function AdminPage() {
                 }
               </Button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* ======================================================
-          ABA: QUIZ IA
-      ====================================================== */}
-      {activeTab === 'quiz' && (
-        <div className="space-y-8 animate-in fade-in duration-500">
-
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 bg-[#4A2080]/20 border border-[#4A2080]/30 rounded-[1.5rem] flex items-center justify-center">
-              <Sparkles className="text-[#7B4FBF]" size={28} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-white uppercase italic">Gerador de Quiz com IA</h2>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
-                Selecione uma aula e gere questões automaticamente
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-
-            {/* Painel de configuração */}
-            <div className="lg:col-span-4">
-              <div className="bg-slate-900/50 border border-[#4A2080]/20 p-8 rounded-[2.5rem] space-y-6">
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">Aula</label>
-                  <select
-                    value={quizLesson}
-                    onChange={e => { setQuizLesson(e.target.value); setGeneratedQs([]); }}
-                    className="w-full bg-slate-950 border border-white/10 rounded-xl p-4 text-white text-sm"
-                  >
-                    <option value="">Selecione uma aula...</option>
-                    {lessons.map(l => (
-                      <option key={l.id} value={l.id}>{l.title}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">
-                    Número de questões: <span className="text-[#7B4FBF]">{quizQuestionCount}</span>
-                  </label>
-                  <input
-                    type="range" min={3} max={10} step={1}
-                    value={quizQuestionCount}
-                    onChange={e => setQuizQuestionCount(Number(e.target.value))}
-                    className="w-full accent-[#4A2080]"
-                  />
-                  <div className="flex justify-between text-[9px] text-slate-600 font-bold uppercase mt-1">
-                    <span>3</span><span>10</span>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={handleGenerateQuiz}
-                  disabled={generatingQuiz || !quizLesson}
-                  className="w-full h-14 bg-[#4A2080] hover:bg-[#5D2A9E] text-white font-black uppercase italic rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-                >
-                  {generatingQuiz
-                    ? <><Loader2 className="animate-spin" size={18} /> Gerando...</>
-                    : <><Sparkles size={18} /> Gerar questões</>
-                  }
-                </Button>
-
-                {generatedQs.length > 0 && (
-                  <Button
-                    onClick={handleSaveQuiz}
-                    disabled={savingQuiz}
-                    className="w-full h-14 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase italic rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
-                  >
-                    {savingQuiz
-                      ? <><Loader2 className="animate-spin" size={18} /> Salvando...</>
-                      : <><CheckCircle2 size={18} /> Salvar {generatedQs.length} questões</>
-                    }
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Preview das questões */}
-            <div className="lg:col-span-8">
-              {generatingQuiz && (
-                <div className="flex flex-col items-center justify-center py-24 gap-4">
-                  <div className="h-16 w-16 rounded-[1.5rem] bg-[#4A2080]/20 border border-[#4A2080]/30 flex items-center justify-center">
-                    <Sparkles className="text-[#7B4FBF] animate-pulse" size={32} />
-                  </div>
-                  <p className="text-slate-500 text-xs font-black uppercase tracking-widest">
-                    Gerando questões com IA...
-                  </p>
-                </div>
-              )}
-
-              {!generatingQuiz && generatedQs.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-24 gap-4 text-center">
-                  <Sparkles size={40} className="text-slate-700" />
-                  <p className="text-slate-600 text-sm font-bold uppercase tracking-widest">
-                    As questões geradas aparecerão aqui
-                  </p>
-                  <p className="text-slate-700 text-xs">
-                    Selecione uma aula e clique em "Gerar questões"
-                  </p>
-                </div>
-              )}
-
-              {generatedQs.length > 0 && (
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
-                  {generatedQs.map((q, index) => (
-                    <div key={index} className="bg-slate-900/60 border border-white/5 p-6 rounded-[2rem] space-y-4">
-
-                      {/* Header */}
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                          <span className="h-6 w-6 rounded-lg bg-[#4A2080]/30 text-[#7B4FBF] text-[10px] font-black flex items-center justify-center flex-shrink-0">
-                            {index + 1}
-                          </span>
-                          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-full border ${
-                            q.type === 'true_false'
-                              ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
-                              : 'bg-[#4A2080]/20 text-[#7B4FBF] border-[#4A2080]/30'
-                          }`}>
-                            {q.type === 'true_false' ? 'V / F' : 'Múltipla escolha'}
-                          </span>
-                        </div>
-                        <button
-                          onClick={() => removeQuestion(index)}
-                          className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0 p-1"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-
-                      {/* Enunciado editável */}
-                      <textarea
-                        value={q.question_text}
-                        onChange={e => updateQuestion(index, 'question_text', e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white text-sm resize-none focus:outline-none focus:border-[#4A2080]/50 transition-all"
-                        rows={2}
-                      />
-
-                      {/* Opções */}
-                      <div className="space-y-2">
-                        {q.options.map((opt, optIdx) => (
-                          <div key={optIdx} className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              onClick={() => updateQuestion(index, 'correct_option_index', optIdx)}
-                              className={`flex-shrink-0 h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                                q.correct_option_index === optIdx
-                                  ? 'border-emerald-500 bg-emerald-500'
-                                  : 'border-white/20 hover:border-white/40'
-                              }`}
-                            >
-                              {q.correct_option_index === optIdx && (
-                                <span className="text-white text-[8px] font-black">✓</span>
-                              )}
-                            </button>
-                            <input
-                              value={opt}
-                              onChange={e => {
-                                const newOpts = [...q.options];
-                                newOpts[optIdx] = e.target.value;
-                                updateQuestion(index, 'options', newOpts);
-                              }}
-                              disabled={q.type === 'true_false'}
-                              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-[#4A2080]/50 transition-all disabled:opacity-50"
-                            />
-                          </div>
-                        ))}
-                        <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest pt-1">
-                          ● = resposta correta — clique para alterar
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}

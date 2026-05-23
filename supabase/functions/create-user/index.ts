@@ -4,12 +4,13 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { status: 200, headers: corsHeaders })
   }
 
   try {
@@ -21,7 +22,6 @@ serve(async (req) => {
       })
     }
 
-    // Cliente com a chave do usuário (para verificar se é admin)
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -50,42 +50,94 @@ serve(async (req) => {
     // 2. Lê o body
     const { email, password, fullName, courseId } = await req.json()
 
-    if (!email || !password || !fullName || !courseId) {
-      return new Response(JSON.stringify({ error: 'Campos obrigatórios faltando' }), {
+    if (!email || !courseId) {
+      return new Response(JSON.stringify({ error: 'Email e curso são obrigatórios' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
-    // 3. Cria o usuário com a chave de SERVICE (não afeta sessão do admin)
+    // 3. Cliente admin (service role)
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // já confirma o email automaticamente
-      user_metadata: { full_name: fullName },
-    })
+    // 4. Verifica se o usuário já existe pelo email
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = existingUsers?.users?.find(u => u.email === email)
 
-    if (createError) throw createError
+    let userId: string
 
-    // 4. Cria o perfil
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert([{ id: newUser.user.id, full_name: fullName, xp: 0 }])
+    if (existingUser) {
+      // Usuário já existe — apenas reutiliza o ID
+      userId = existingUser.id
 
-    if (profileError) throw profileError
+      // Garante que o perfil existe
+      await supabaseAdmin
+        .from('profiles')
+        .upsert([{ id: userId, full_name: fullName || existingUser.user_metadata?.full_name || '', xp: 0 }], {
+          onConflict: 'id',
+          ignoreDuplicates: true,
+        })
 
-    // 5. Cria a matrícula
+    } else {
+      // Usuário não existe — cria normalmente
+      if (!password || !fullName) {
+        return new Response(JSON.stringify({ error: 'Senha e nome são obrigatórios para novo aluno' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+
+      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: fullName },
+      })
+
+      if (createError) throw createError
+      userId = newUser.user.id
+
+      // Cria o perfil
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert([{ id: userId, full_name: fullName, xp: 0 }])
+
+      if (profileError) throw profileError
+    }
+
+    // 5. Verifica se já está matriculado nesse curso
+    const { data: existingEnrollment } = await supabaseAdmin
+      .from('enrollments')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('product_id', courseId)
+      .maybeSingle()
+
+    if (existingEnrollment) {
+      return new Response(JSON.stringify({
+        success: true,
+        userId,
+        message: 'Aluno já estava matriculado neste curso.',
+        alreadyEnrolled: true,
+      }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
+
+    // 6. Cria a matrícula no novo curso
     const { error: enrollError } = await supabaseAdmin
       .from('enrollments')
-      .insert([{ user_id: newUser.user.id, product_id: courseId }])
+      .insert([{ user_id: userId, product_id: courseId }])
 
     if (enrollError) throw enrollError
 
-    return new Response(JSON.stringify({ success: true, userId: newUser.user.id }), {
+    return new Response(JSON.stringify({
+      success: true,
+      userId,
+      message: existingUser ? 'Aluno existente matriculado no novo curso!' : 'Aluno criado e matriculado!',
+      alreadyEnrolled: false,
+    }), {
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
