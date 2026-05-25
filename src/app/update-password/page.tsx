@@ -26,38 +26,28 @@ export default function UpdatePasswordPage() {
   const isValidPassword = passwordChecks.minLength && passwordChecks.hasMatch;
 
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        // Aguarda um pouco para o Supabase processar o hash da URL
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Erro ao verificar sessão:', error);
-          throw error;
-        }
+  const checkSession = async () => {
+    // 1. Tenta pegar a sessão atual
+    const { data } = await supabase.auth.getSession();
 
-        if (data.session) {
+    // 2. Se não houver sessão, aguarda o listener de autenticação
+    // Isso é mais robusto que um timeout fixo
+    if (!data.session) {
+      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY' && session) {
           setIsReady(true);
-        } else {
-          // Tenta obter o usuário diretamente
-          const { data: userData } = await supabase.auth.getUser();
-          if (userData.user) {
-            setIsReady(true);
-          } else {
-            throw new Error('Sessão não encontrada');
-          }
         }
-      } catch (err) {
-        console.error('Erro ao validar link:', err);
-        setError('Link inválido ou expirado.');
-        setTimeout(() => router.push('/login'), 3000);
-      }
-    };
+      });
+      
+      // Limpeza do listener caso o componente desmonte
+      return () => authListener.subscription.unsubscribe();
+    } else {
+      setIsReady(true);
+    }
+  };
 
-    checkSession();
-  }, [router]);
+  checkSession();
+}, []);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
