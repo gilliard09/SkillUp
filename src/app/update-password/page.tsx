@@ -26,27 +26,37 @@ export default function UpdatePasswordPage() {
   const isValidPassword = passwordChecks.minLength && passwordChecks.hasMatch;
 
   useEffect(() => {
-  const checkSession = async () => {
-    // 1. Tenta pegar a sessão atual
-    const { data } = await supabase.auth.getSession();
-
-    // 2. Se não houver sessão, aguarda o listener de autenticação
-    // Isso é mais robusto que um timeout fixo
-    if (!data.session) {
-      const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-        if (event === 'PASSWORD_RECOVERY' && session) {
-          setIsReady(true);
-        }
-      });
-      
-      // Limpeza do listener caso o componente desmonte
-      return () => authListener.subscription.unsubscribe();
-    } else {
+  const init = async () => {
+    // 1. Tenta recuperar a sessão atual imediatamente (leitura de token na URL)
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session) {
       setIsReady(true);
+      return;
     }
+
+    // 2. Se não encontrou, configura o listener apenas para capturar o evento de recuperação
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) {
+        setIsReady(true);
+      }
+    });
+
+    // 3. Segurança: Se após 5 segundos nada aconteceu, assume que o link expirou
+    const timeout = setTimeout(() => {
+      if (!isReady) {
+        setError('O link de redefinição expirou ou não foi validado.');
+        setTimeout(() => router.push('/login'), 3000);
+      }
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   };
 
-  checkSession();
+  init();
 }, []);
 
   const handleUpdate = async (e: React.FormEvent) => {
