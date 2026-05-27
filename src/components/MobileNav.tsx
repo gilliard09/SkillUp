@@ -15,7 +15,7 @@ type NavItem = {
 
 const BASE_ITEMS: NavItem[] = [
   { icon: LayoutGrid, label: 'Início',    href: '/dashboard' },
-  { icon: Zap,        label: 'Sequência', href: '/dashboard/sequencia', isSequencia: true },
+  { icon: Zap,        label: 'Bolão', href: '/dashboard/sequencia', isSequencia: true },
   { icon: Sword,      label: 'Desafios',  href: '/dashboard/challenges' },
   { icon: Trophy,     label: 'Ranking',   href: '/dashboard/ranking' },
   { icon: User,       label: 'Perfil',    href: '/dashboard/profile' },

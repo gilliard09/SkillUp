@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { LevelUpModal } from '@/components/dashboard/levelupmodal';
-import { PlayCircle, Loader2, Zap, LayoutGrid } from 'lucide-react';
+import { PlayCircle, Loader2, Zap, LayoutGrid, Trophy } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -27,7 +27,7 @@ type Profile = {
   xp: number;
   streak: number;
   last_practice_date: string | null;
-  organization_id: string | null; // NOVA MUDANÇA: Adicionado campo de organização
+  organization_id: string | null;
 };
 
 type Level = {
@@ -172,6 +172,94 @@ function SequenciaCard({ streak, practicedToday: doneToday }: { streak: number; 
 }
 
 // ============================================================
+// COMPONENTE CARD DO BOLÃO
+// ============================================================
+function BolaoCard() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.2 }}
+      className="mb-10"
+    >
+      <div className="relative overflow-hidden rounded-[2rem] border border-yellow-400/30 bg-gradient-to-br from-slate-900/90 to-black/90 backdrop-blur-xl p-6 shadow-2xl shadow-yellow-500/10">
+        {/* Glow effect */}
+        <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 via-green-500/5 to-yellow-500/5 blur-2xl -z-10" />
+        
+        {/* Grid pattern background */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,215,0,0.3) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,215,0,0.3) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px'
+          }} />
+        </div>
+
+        <div className="relative flex flex-col md:flex-row items-center justify-between gap-6">
+          {/* Conteúdo */}
+          <div className="flex items-center gap-5">
+            {/* Ícone */}
+            <div className="h-16 w-16 rounded-[1.25rem] bg-gradient-to-br from-yellow-400 to-yellow-500 flex items-center justify-center shadow-lg shadow-yellow-500/50 flex-shrink-0">
+              <Trophy size={32} className="text-black" fill="currentColor" />
+            </div>
+
+            {/* Texto */}
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black text-yellow-400 uppercase tracking-widest">
+                  Bolão da Copa 2026
+                </span>
+              </div>
+              <h3 className="text-xl md:text-2xl font-black text-white mb-1 uppercase tracking-tight">
+                Acerte o placar e ganhe
+              </h3>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl md:text-4xl font-black text-transparent bg-gradient-to-r from-yellow-400 to-yellow-500 bg-clip-text">
+                  R$ 100
+                </span>
+                <span className="text-slate-400 text-xs font-bold uppercase">
+                  via PIX ⚡
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botão */}
+          <Link href="/bolao">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="relative group px-8 py-4 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-2xl font-black uppercase text-sm tracking-wide shadow-lg shadow-yellow-500/50 overflow-hidden whitespace-nowrap"
+            >
+              {/* Glow interno */}
+              <div className="absolute inset-0 bg-gradient-to-r from-yellow-300 to-yellow-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              
+              {/* Texto */}
+              <span className="relative text-[#0d5e2a] flex items-center gap-2">
+                Participar Agora
+                <Zap size={16} fill="currentColor" className="group-hover:rotate-12 transition-transform" />
+              </span>
+            </motion.button>
+          </Link>
+        </div>
+
+        {/* Detalhes extras em mobile */}
+        <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
+          <span>⚽ Brasil x Marrocos</span>
+          <span>•</span>
+          <span>📅 13/06</span>
+          <span>•</span>
+          <span>🕐 19h</span>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================================
 // PÁGINA PRINCIPAL
 // ============================================================
 export default function DashboardPage() {
@@ -199,7 +287,6 @@ export default function DashboardPage() {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { router.push('/login'); return; }
 
-        // NOVA MUDANÇA: Adicionado organization_id na query do perfil
         const [profileRes, enrollmentsRes] = await Promise.all([
           supabase
             .from('profiles')
@@ -318,6 +405,9 @@ export default function DashboardPage() {
         )}
 
         <SequenciaCard streak={streak} practicedToday={doneToday} />
+        
+        {/* CARD DO BOLÃO - NOVO */}
+        <BolaoCard />
 
         {enrolledCourses.length === 0 ? (
           <div className="max-w-md mx-auto text-center py-24 bg-slate-900/40 rounded-[3rem] border border-dashed border-white/10 px-8 mt-12">
