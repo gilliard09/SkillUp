@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // ============================================================
 // ROTAS PÚBLICAS — usuário logado é redirecionado para /dashboard
 // ============================================================
-const PUBLIC_ONLY_ROUTES = ['/login', '/vip-register', '/update-password', '/bolao']
+const PUBLIC_ONLY_ROUTES = ['/login', '/vip-register', '/update-password']
 
 export async function middleware(request: NextRequest) {
   // Variáveis de ambiente com verificação explícita
@@ -83,7 +83,6 @@ export const config = {
     '/',
     '/login',
     '/update-password',
-    '/bolao',
     '/vip-register/:path*',
     '/dashboard/:path*',
   ],
