@@ -129,10 +129,10 @@ function SequenciaCard({ streak, practicedToday: doneToday }: { streak: number; 
               ) : (
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Praticar hoje
+                    Acesse o Baú de Prompts
                   </span>
                   <span className="text-brand-primary text-[9px] font-black uppercase tracking-wider">
-                    Não perca a sequência →
+                    clique e resgate o prompt do dia →
                   </span>
                 </div>
               )}
