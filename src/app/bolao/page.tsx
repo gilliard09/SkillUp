@@ -230,7 +230,7 @@ export default function BolaoPage() {
           <div>
             <div className="inline-flex items-center gap-2 bg-yellow-400 text-black px-3.5 py-1.5 rounded-lg text-xs font-black mb-4 shadow-lg shadow-yellow-500/30">
               <Zap size={13} fill="currentColor" />
-              1º JOGO DA SELEÇÃO
+              2º JOGO DA SELEÇÃO
             </div>
             <h1 className="font-black tracking-tight leading-none mb-3">
               <span className="block text-5xl sm:text-6xl md:text-8xl text-white">BOLÃO</span>
@@ -275,7 +275,7 @@ export default function BolaoPage() {
 
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                <span className="text-yellow-400 text-xs font-black uppercase tracking-widest">Primeiro Jogo</span>
+                <span className="text-yellow-400 text-xs font-black uppercase tracking-widest">Segundo Jogo</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -301,16 +301,16 @@ export default function BolaoPage() {
                   <div className="w-12 h-px bg-yellow-400/40 mx-auto mt-2" />
                 </div>
 
-                {/* Marrocos */}
+                {/* Haiti */}
                 <div className="text-center flex-1">
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-3">
                     <div className="absolute inset-0 bg-red-500/30 rounded-xl blur-xl" />
                     <div className="relative w-full h-full bg-gradient-to-br from-red-600 to-red-800 rounded-xl border-2 border-yellow-400 flex items-center justify-center shadow-xl">
-                      <Image src="/marrocos.png" alt="Marrocos" width={64} height={64} className="object-contain" />
+                      <Image src="/haiti.png" alt="Haiti" width={64} height={64} className="object-contain" />
                     </div>
                   </div>
-                  <p className="font-black text-base text-white uppercase tracking-wide">Marrocos</p>
-                  <p className="text-xs text-zinc-500 font-mono">MAR</p>
+                  <p className="font-black text-base text-white uppercase tracking-wide">Haiti</p>
+                  <p className="text-xs text-zinc-500 font-mono">HAI</p>
                 </div>
               </div>
 
@@ -319,14 +319,14 @@ export default function BolaoPage() {
                   <span className="text-xl">📅</span>
                   <div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase">Data</p>
-                    <p className="text-white font-bold text-sm">13 de Junho</p>
+                    <p className="text-white font-bold text-sm">19 de Junho</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 bg-black/40 border border-yellow-500/20 rounded-xl p-3">
                   <span className="text-xl">🕐</span>
                   <div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase">Horário</p>
-                    <p className="text-white font-bold text-sm">19h (Brasília)</p>
+                    <p className="text-white font-bold text-sm">21h30 (Brasília)</p>
                   </div>
                 </div>
               </div>
@@ -380,7 +380,7 @@ export default function BolaoPage() {
               <ul className="grid sm:grid-cols-2 gap-2 text-sm text-zinc-300">
                 {[
                   'Apenas 1 palpite por pessoa',
-                  'Palpites encerram às 18h50 (10 min antes)',
+                  'Palpites encerram às 21h20 (10 min antes)',
                   'Caso haja mais de um acertador, sorteio entre eles',
                   'Apenas cadastros pelo formulário oficial',
                   'Casos omissos decididos pela direção da escola',
