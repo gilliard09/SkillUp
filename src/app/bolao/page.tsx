@@ -530,7 +530,7 @@ export default function BolaoPage() {
                     </div>
                     <p className="text-2xl font-black text-yellow-400 mb-4 select-none">×</p>
                     <div>
-                      <p className="text-xs text-center text-zinc-400 font-bold uppercase mb-2">Marrocos</p>
+                      <p className="text-xs text-center text-zinc-400 font-bold uppercase mb-2">Haiti</p>
                       <Input
                         type="number"
                         placeholder="0"
