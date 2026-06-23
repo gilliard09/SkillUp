@@ -380,7 +380,7 @@ export default function BolaoPage() {
               <ul className="grid sm:grid-cols-2 gap-2 text-sm text-zinc-300">
                 {[
                   'Apenas 1 palpite por pessoa',
-                  'Palpites encerram às 21h20 (10 min antes)',
+                  'Palpites encerram às 18h50 (10 min antes)',
                   'Caso haja mais de um acertador, sorteio entre eles',
                   'Apenas cadastros pelo formulário oficial',
                   'Casos omissos decididos pela direção da escola',
