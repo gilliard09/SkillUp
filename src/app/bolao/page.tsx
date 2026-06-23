@@ -230,7 +230,7 @@ export default function BolaoPage() {
           <div>
             <div className="inline-flex items-center gap-2 bg-yellow-400 text-black px-3.5 py-1.5 rounded-lg text-xs font-black mb-4 shadow-lg shadow-yellow-500/30">
               <Zap size={13} fill="currentColor" />
-              2º JOGO DA SELEÇÃO
+              3º JOGO DA SELEÇÃO
             </div>
             <h1 className="font-black tracking-tight leading-none mb-3">
               <span className="block text-5xl sm:text-6xl md:text-8xl text-white">BOLÃO</span>
@@ -275,7 +275,7 @@ export default function BolaoPage() {
 
               <div className="flex items-center gap-2 mb-5">
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
-                <span className="text-yellow-400 text-xs font-black uppercase tracking-widest">Segundo Jogo</span>
+                <span className="text-yellow-400 text-xs font-black uppercase tracking-widest">Terceiro Jogo</span>
               </div>
 
               <div className="flex items-center justify-between">
@@ -284,7 +284,7 @@ export default function BolaoPage() {
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-3">
                     <div className="absolute inset-0 bg-green-500/30 rounded-xl blur-xl" />
                     <div className="relative w-full h-full bg-gradient-to-br from-green-600 to-green-800 rounded-xl border-2 border-yellow-400 flex items-center justify-center shadow-xl">
-                      <Image src="/brasil.png" alt="Brasil" width={64} height={64} className="object-contain" />
+                      <Image src="/brasil.png" alt="Brasil" width={80} height={80} className="object-contain" />
                     </div>
                   </div>
                   <p className="font-black text-base text-white uppercase tracking-wide">Brasil</p>
@@ -301,16 +301,16 @@ export default function BolaoPage() {
                   <div className="w-12 h-px bg-yellow-400/40 mx-auto mt-2" />
                 </div>
 
-                {/* Haiti */}
+                {/* Escocia */}
                 <div className="text-center flex-1">
                   <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-3">
-                    <div className="absolute inset-0 bg-red-500/30 rounded-xl blur-xl" />
-                    <div className="relative w-full h-full bg-gradient-to-br from-red-600 to-red-800 rounded-xl border-2 border-yellow-400 flex items-center justify-center shadow-xl">
-                      <Image src="/haiti.png" alt="Haiti" width={64} height={64} className="object-contain" />
+                    <div className="absolute inset-0 bg-blue-500/30 rounded-xl blur-xl" />
+                    <div className="relative w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 rounded-xl border-2 border-yellow-400 flex items-center justify-center shadow-xl">
+                      <Image src="/escocia.png" alt="Escocia" width={80} height={80} className="object-contain" />
                     </div>
                   </div>
-                  <p className="font-black text-base text-white uppercase tracking-wide">Haiti</p>
-                  <p className="text-xs text-zinc-500 font-mono">HAI</p>
+                  <p className="font-black text-base text-white uppercase tracking-wide">Escocia</p>
+                  <p className="text-xs text-zinc-500 font-mono">SCO</p>
                 </div>
               </div>
 
@@ -319,14 +319,14 @@ export default function BolaoPage() {
                   <span className="text-xl">📅</span>
                   <div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase">Data</p>
-                    <p className="text-white font-bold text-sm">19 de Junho</p>
+                    <p className="text-white font-bold text-sm">26 de Junho</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2.5 bg-black/40 border border-yellow-500/20 rounded-xl p-3">
                   <span className="text-xl">🕐</span>
                   <div>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase">Horário</p>
-                    <p className="text-white font-bold text-sm">21h30 (Brasília)</p>
+                    <p className="text-white font-bold text-sm">19h (Brasília)</p>
                   </div>
                 </div>
               </div>
@@ -530,20 +530,20 @@ export default function BolaoPage() {
                     </div>
                     <p className="text-2xl font-black text-yellow-400 mb-4 select-none">×</p>
                     <div>
-                      <p className="text-xs text-center text-zinc-400 font-bold uppercase mb-2">Haiti</p>
+                      <p className="text-xs text-center text-zinc-400 font-bold uppercase mb-2">Escócia</p>
                       <Input
                         type="number"
                         placeholder="0"
                         min="0"
                         className="score-input"
-                        style={{ borderColor: 'rgba(239,68,68,0.5)' }}
+                        style={{ borderColor: 'rgba(68, 142, 239, 0.9)'}}
                         value={placarMarrocos}
                         onChange={(e) => setPlacarMarrocos(e.target.value)}
                         onFocus={(e) =>
-                          (e.target.style.borderColor = 'rgba(239,68,68,0.9)')
+                          (e.target.style.borderColor = 'rgba(68, 142, 239, 0.9)')
                         }
                         onBlur={(e) =>
-                          (e.target.style.borderColor = 'rgba(239,68,68,0.5)')
+                          (e.target.style.borderColor = 'rgba(68,142,239,0.9)')
                         }
                       />
                     </div>

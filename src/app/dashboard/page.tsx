@@ -248,11 +248,11 @@ function BolaoCard() {
 
         {/* Detalhes extras em mobile */}
         <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-center gap-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider">
-          <span>⚽ Brasil x Haiti</span>
+          <span>⚽ Brasil x Escócia</span>
           <span>•</span>
-          <span>📅 19/06</span>
+          <span>📅 26/06</span>
           <span>•</span>
-          <span>🕐 21h30</span>
+          <span>🕐 19h</span>
         </div>
       </div>
     </motion.div>
