@@ -106,7 +106,7 @@ export default function RankingPage() {
     });
 
     if (!error && data) {
-      const rows = data as Array<RankUser & { period_xp: number; total_xp: number; position: number }>;
+      const rows = data as Array<{ user_id: string; full_name: string | null; period_xp: number; total_xp: number; ranking_position: number }>;
       setTopUsers(rows.slice(0, 10).map(row => ({
         id: row.user_id,
         full_name: row.full_name,
