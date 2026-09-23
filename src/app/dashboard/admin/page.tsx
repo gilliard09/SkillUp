@@ -452,11 +452,9 @@ export default function AdminPage() {
           .select('id, title, module_id, order_index')
           .in('module_id', moduleIds)
           .order('order_index', { ascending: true }),
-        supabase
-          .from('lesson_progress')
-          .select('lesson_id, is_completed, completed_at')
-          .eq('user_id', student.id)
-          .eq('is_completed', true),
+        supabase.rpc('get_student_lesson_progress', {
+          p_student_id: student.id,
+        }),
       ]);
 
       if (lessonsRes.error) throw lessonsRes.error;
