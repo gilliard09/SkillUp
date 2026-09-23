@@ -1,10 +1,11 @@
 import { ReactNode } from 'react';
 import { Sidebar } from '@/components/shared/sidebar';
 import { MobileNav } from '@/components/MobileNav';
+import { DashboardUserProvider } from '@/components/shared/dashboard-user-provider';
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    // bg-slate-950 definido UMA VEZ aqui — sidebar e todas as páginas herdam
+    <DashboardUserProvider>
     <div className="flex min-h-screen bg-slate-950">
 
       {/* Sidebar desktop */}
@@ -23,5 +24,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <MobileNav />
 
     </div>
+    </DashboardUserProvider>
   );
 }
