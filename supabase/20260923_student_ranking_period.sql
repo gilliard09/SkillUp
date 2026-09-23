@@ -37,17 +37,35 @@ begin
   end;
 
   return query
-  with period_scores as (
+  with period_activity as (
+    -- Para aulas, a data oficial é lesson_progress.completed_at.
+    select
+      lp.user_id,
+      coalesce(l.xp_reward, 0)::bigint as xp_earned
+    from public.lesson_progress lp
+    join public.lessons l on l.id = lp.lesson_id
+    where lp.is_completed = true
+      and lp.completed_at >= v_start
+
+    union all
+
+    -- Quiz, desafio e demais atividades continuam usando seu histórico de XP.
+    select
+      la.user_id,
+      la.xp_earned::bigint
+    from public.learning_activity la
+    where la.activity_type <> 'lesson'
+      and la.xp_earned > 0
+      and la.created_at >= v_start
+  ),
+  period_scores as (
     select
       p.id as user_id,
       p.full_name,
-      sum(la.xp_earned)::bigint as period_xp,
+      sum(pa.xp_earned)::bigint as period_xp,
       coalesce(p.xp, 0)::integer as total_xp
     from public.profiles p
-    join public.learning_activity la
-      on la.user_id = p.id
-     and la.created_at >= v_start
-     and la.xp_earned > 0
+    join period_activity pa on pa.user_id = p.id
     where p.organization_id = v_org
     group by p.id, p.full_name, p.xp
   ),
