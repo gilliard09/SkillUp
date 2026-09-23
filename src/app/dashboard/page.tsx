@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
@@ -25,22 +25,26 @@ type Course={id:string;title:string;description:string|null;image_url:string|nul
 type Lesson={id:string;title:string;module_id:string;modules:{course_id:string;title:string}[]|null};
 
 export default function DashboardPage(){
- const router=useRouter(); const [profile,setProfile]=useState<any>(null); const [courses,setCourses]=useState<Course[]>([]); const [resume,setResume]=useState<Lesson|null>(null); const [progress,setProgress]=useState(0); const [stats,setStats]=useState({lessons:0,quizzes:0,challenges:0,projects:0}); const [unread,setUnread]=useState(0); const [loading,setLoading]=useState(true); const [showLevelUp,setShowLevelUp]=useState(false); const [oldXp,setOldXp]=useState<number|null>(null);
+ const router=useRouter(); const [profile,setProfile]=useState<any>(null); const [courses,setCourses]=useState<Course[]>([]); const [resume,setResume]=useState<Lesson|null>(null); const [progress,setProgress]=useState(0); const [stats,setStats]=useState({lessons:0,quizzes:0,challenges:0,projects:0}); const [unread,setUnread]=useState(0); const [loading,setLoading]=useState(true); const [showLevelUp,setShowLevelUp]=useState(false);
  useEffect(()=>{ (async()=>{ const {data:{user}}=await supabase.auth.getUser(); if(!user){router.push('/login');return;} try{
    const [pr,en]=await Promise.all([supabase.from('profiles').select('full_name,xp,streak,last_practice_date,organization_id').eq('id',user.id).maybeSingle(),supabase.from('enrollments').select('product_id').eq('user_id',user.id)]);
-   const p=pr.data; if(p){if(oldXp!==null&&level(p.xp).min>level(oldXp).min)setShowLevelUp(true);setOldXp(p.xp);setProfile(p)}
+   const p=pr.data; if(p){setProfile(p)}
    const ids=en.data?.map(x=>x.product_id)??[]; if(!ids.length){setLoading(false);return;}
    const [cr,mods,completed,activities,projects,notifs]=await Promise.all([
     supabase.from('courses').select('id,title,description,image_url,category').in('id',ids).order('title'),
-    supabase.from('modules').select('id,course_id').in('course_id',ids),
+    supabase.from('modules').select('id,course_id,title,lessons(id,title,module_id)').in('course_id',ids).order('order_index'),
     supabase.from('lesson_progress').select('lesson_id').eq('user_id',user.id).eq('is_completed',true),
     supabase.from('learning_activity').select('activity_type').eq('user_id',user.id),
     supabase.from('student_projects').select('id').eq('user_id',user.id),
     supabase.from('notifications').select('id').eq('user_id',user.id).is('read_at',null)
    ]);
    const cs=(cr.data as Course[])??[]; setCourses(cs); setUnread(notifs.data?.length??0);
-   const mids=mods.data?.map(x=>x.id)??[]; const completedIds=completed.data?.map(x=>x.lesson_id)??[];
-   if(mids.length){const {data:lessons}=await supabase.from('lessons').select('id,title,module_id,modules(course_id,title)').in('module_id',mids).order('id'); const all=lessons??[]; const done=new Set(completedIds); const first=all.find(x=>!done.has(x.id)); setResume((first as Lesson)??null); setProgress(all.length?Math.round(done.size/all.length*100):0);}
+   const completedIds=completed.data?.map(x=>x.lesson_id)??[];
+   const all=mods.data?.flatMap((module:any)=>(module.lessons??[]).map((lesson:any)=>({
+     ...lesson,
+     modules:[{course_id:module.course_id,title:module.title}],
+   })))??[];
+   const done=new Set(completedIds); const first=all.find((x:any)=>!done.has(x.id)); setResume((first as Lesson)??null); setProgress(all.length?Math.round(done.size/all.length*100):0);
    const acts=activities.data??[]; setStats({lessons:acts.filter(x=>x.activity_type==='lesson').length,quizzes:acts.filter(x=>x.activity_type==='quiz').length,challenges:acts.filter(x=>x.activity_type==='challenge').length,projects:projects.data?.length??0});
  }catch(e){console.error(e)}finally{setLoading(false)}})()},[router,oldXp]);
  const xp=profile?.xp??0, cur=level(xp), nxt=next(xp), streak=profile?.streak??0;
