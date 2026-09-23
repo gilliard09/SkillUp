@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
 import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
 
 type NavItem = {
@@ -35,26 +36,9 @@ function isItemActive(href: string, pathname: string): boolean {
 
 export function MobileNav() {
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [streak, setStreak] = useState(0);
-
-  useEffect(() => {
-    const checkRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, streak')
-        .eq('id', user.id)
-        .single();
-
-      setIsAdmin(profile?.role === 'admin');
-      setStreak(profile?.streak ?? 0);
-    };
-
-    checkRole();
-  }, []);
+  const { profile } = useDashboardUser();
+  const isAdmin = profile?.role === 'admin';
+  const streak = profile?.streak ?? 0;
 
   const menuItems = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
 
