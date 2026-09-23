@@ -1,0 +1,377 @@
+name: Apply student progress feature
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Apply admin student progress
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/app/dashboard/admin/page.tsx")
+          text = path.read_text()
+
+          old = """type StudentData = {
+  id: string;
+  full_name: string;
+  email: string;
+  updated_at: string;
+  courses?: { title: string }[];
+};"""
+          new = """type StudentData = {
+  id: string;
+  full_name: string;
+  email: string;
+  updated_at: string;
+  courses?: { id: string; title: string }[];
+};
+
+type ProgressLesson = {
+  id: string;
+  title: string;
+  module_id: string;
+  order_index: number;
+  is_completed: boolean;
+  completed_at: string | null;
+};
+
+type ProgressModule = {
+  id: string;
+  title: string;
+  course_id: string;
+  order_index: number;
+  lessons: ProgressLesson[];
+};
+
+type ProgressCourse = {
+  id: string;
+  title: string;
+  modules: ProgressModule[];
+};"""
+          if old not in text:
+              raise SystemExit("StudentData marker not found")
+          text = text.replace(old, new, 1)
+
+          old = """  const [studentsData, setStudentsData] = useState<StudentData[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);"""
+          new = """  const [studentsData, setStudentsData] = useState<StudentData[]>([]);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
+  const [studentProgress, setStudentProgress] = useState<ProgressCourse[]>([]);
+  const [loadingStudentProgress, setLoadingStudentProgress] = useState(false);"""
+          if old not in text:
+              raise SystemExit("student state marker not found")
+          text = text.replace(old, new, 1)
+
+          old = """return foundCourse ? { title: foundCourse.title } : null;"""
+          new = """return foundCourse ? { id: foundCourse.id, title: foundCourse.title } : null;"""
+          if old not in text:
+              raise SystemExit("course mapping marker not found")
+          text = text.replace(old, new, 1)
+
+          marker = """  useEffect(() => {
+    if (activeTab === 'data' && adminOrgId) {
+      loadStudentsData();
+    }
+  }, [activeTab, adminOrgId, loadStudentsData]);"""
+          insert = """  // ----------------------------------------------------------
+  // PROGRESSO DO ALUNO — aulas confirmadas pelo professor
+  // ----------------------------------------------------------
+  const loadStudentProgress = useCallback(async (student: StudentData) => {
+    setSelectedStudent(student);
+    setStudentProgress([]);
+    setLoadingStudentProgress(true);
+
+    try {
+      const { data: enrollments, error: enrollmentsError } = await supabase
+        .from('enrollments')
+        .select('product_id')
+        .eq('user_id', student.id);
+
+      if (enrollmentsError) throw enrollmentsError;
+
+      const courseIds = Array.from(
+        new Set((enrollments ?? []).map(enrollment => enrollment.product_id).filter(Boolean))
+      );
+
+      if (courseIds.length === 0) {
+        setStudentProgress([]);
+        return;
+      }
+
+      const [coursesRes, modulesRes] = await Promise.all([
+        supabase.from('courses').select('id, title').in('id', courseIds).order('title'),
+        supabase.from('modules').select('id, title, course_id, order_index').in('course_id', courseIds).order('order_index', { ascending: true }),
+      ]);
+
+      if (coursesRes.error) throw coursesRes.error;
+      if (modulesRes.error) throw modulesRes.error;
+
+      const moduleIds = (modulesRes.data ?? []).map(module => module.id);
+
+      if (moduleIds.length === 0) {
+        setStudentProgress((coursesRes.data ?? []).map(course => ({ ...course, modules: [] })));
+        return;
+      }
+
+      const [lessonsRes, progressRes] = await Promise.all([
+        supabase
+          .from('lessons')
+          .select('id, title, module_id, order_index')
+          .in('module_id', moduleIds)
+          .order('order_index', { ascending: true }),
+        supabase
+          .from('lesson_progress')
+          .select('lesson_id, is_completed, completed_at')
+          .eq('user_id', student.id)
+          .eq('is_completed', true),
+      ]);
+
+      if (lessonsRes.error) throw lessonsRes.error;
+      if (progressRes.error) throw progressRes.error;
+
+      const confirmedByLesson = new Map(
+        (progressRes.data ?? []).map(progress => [
+          progress.lesson_id,
+          { is_completed: true, completed_at: progress.completed_at },
+        ])
+      );
+
+      const lessonsByModule = new Map<string, ProgressLesson[]>();
+
+      for (const lesson of lessonsRes.data ?? []) {
+        const confirmed = confirmedByLesson.get(lesson.id);
+        const item: ProgressLesson = {
+          ...lesson,
+          is_completed: Boolean(confirmed),
+          completed_at: confirmed?.completed_at ?? null,
+        };
+        const current = lessonsByModule.get(lesson.module_id) ?? [];
+        current.push(item);
+        lessonsByModule.set(lesson.module_id, current);
+      }
+
+      const modulesByCourse = new Map<string, ProgressModule[]>();
+
+      for (const module of modulesRes.data ?? []) {
+        const item: ProgressModule = {
+          ...module,
+          lessons: lessonsByModule.get(module.id) ?? [],
+        };
+        const current = modulesByCourse.get(module.course_id) ?? [];
+        current.push(item);
+        modulesByCourse.set(module.course_id, current);
+      }
+
+      setStudentProgress(
+        (coursesRes.data ?? []).map(course => ({
+          ...course,
+          modules: modulesByCourse.get(course.id) ?? [],
+        }))
+      );
+    } catch (error) {
+      console.error('Erro ao carregar progresso do aluno:', error);
+      notify('error', 'Não foi possível carregar o progresso deste aluno.');
+    } finally {
+      setLoadingStudentProgress(false);
+    }
+  }, []);
+
+""" + marker
+          if marker not in text:
+              raise SystemExit("data effect marker not found")
+          text = text.replace(marker, insert, 1)
+
+          old = """<tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">"""
+          new = """<tr
+                        key={student.id}
+                        onClick={() => loadStudentProgress(student)}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Clique para ver o progresso do aluno"
+                      >"""
+          if old not in text:
+              raise SystemExit("student row marker not found")
+          text = text.replace(old, new, 1)
+
+          marker = """      {/* ======================================================
+          ABA: CONFIGURAÇÕES
+      ====================================================== */}"""
+          modal = r'''      {/* ======================================================
+          MODAL: PROGRESSO DO ALUNO
+      ====================================================== */}
+      {selectedStudent && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setSelectedStudent(null)}>
+          <div className="bg-slate-950 border border-white/10 rounded-[2rem] w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="p-6 md:p-8 border-b border-white/5 flex items-start justify-between gap-6">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="h-11 w-11 rounded-2xl bg-brand-primary/10 flex items-center justify-center text-brand-primary font-black">
+                    {selectedStudent.full_name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl md:text-2xl font-black text-white uppercase italic">{selectedStudent.full_name}</h2>
+                    <p className="text-slate-500 text-xs font-medium">{selectedStudent.email}</p>
+                  </div>
+                </div>
+                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-4">
+                  Progresso baseado exclusivamente nas aulas confirmadas pelo professor
+                </p>
+              </div>
+              <button onClick={() => setSelectedStudent(null)} className="text-slate-500 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/5" aria-label="Fechar">
+                <X size={22} />
+              </button>
+            </div>
+
+            {loadingStudentProgress ? (
+              <div className="flex items-center justify-center py-24">
+                <Loader2 className="animate-spin text-brand-primary" size={40} />
+              </div>
+            ) : (
+              <div className="p-6 md:p-8 overflow-y-auto max-h-[calc(90vh-150px)]">
+                {(() => {
+                  const allLessons = studentProgress.flatMap(course => course.modules.flatMap(module => module.lessons));
+                  const completedCount = allLessons.filter(lesson => lesson.is_completed).length;
+                  const pendingCount = allLessons.length - completedCount;
+                  const progressPercent = allLessons.length > 0 ? Math.round((completedCount / allLessons.length) * 100) : 0;
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white/5 border border-white/5 rounded-2xl p-5">
+                          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total de aulas</p>
+                          <p className="text-white text-3xl font-black mt-1">{allLessons.length}</p>
+                        </div>
+                        <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-5">
+                          <p className="text-emerald-500/70 text-[10px] font-black uppercase tracking-widest">Confirmadas</p>
+                          <p className="text-emerald-400 text-3xl font-black mt-1">{completedCount}</p>
+                        </div>
+                        <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-5">
+                          <p className="text-amber-500/70 text-[10px] font-black uppercase tracking-widest">Faltam</p>
+                          <p className="text-amber-400 text-3xl font-black mt-1">{pendingCount}</p>
+                        </div>
+                        <div className="bg-brand-primary/5 border border-brand-primary/10 rounded-2xl p-5">
+                          <p className="text-brand-primary/70 text-[10px] font-black uppercase tracking-widest">Progresso</p>
+                          <p className="text-brand-primary text-3xl font-black mt-1">{progressPercent}%</p>
+                        </div>
+                      </div>
+
+                      <div className="mb-8">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Progresso geral</span>
+                          <span className="text-white text-xs font-black">{completedCount} de {allLessons.length}</span>
+                        </div>
+                        <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                          <div className="h-full bg-brand-primary rounded-full transition-all" style={{ width: `${progressPercent}%` }} />
+                        </div>
+                      </div>
+
+                      {studentProgress.length === 0 ? (
+                        <div className="py-16 text-center border border-dashed border-white/10 rounded-3xl">
+                          <BookOpen className="mx-auto text-slate-600 mb-3" size={40} />
+                          <p className="text-slate-500 font-black uppercase text-xs tracking-widest">Este aluno não possui cursos matriculados.</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {studentProgress.map(course => {
+                            const courseLessons = course.modules.flatMap(module => module.lessons);
+                            const courseCompleted = courseLessons.filter(lesson => lesson.is_completed).length;
+                            const coursePercent = courseLessons.length > 0 ? Math.round((courseCompleted / courseLessons.length) * 100) : 0;
+
+                            return (
+                              <div key={course.id} className="border border-white/5 rounded-3xl overflow-hidden">
+                                <div className="p-5 md:p-6 bg-white/[0.03] border-b border-white/5">
+                                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                    <div>
+                                      <p className="text-brand-primary text-[10px] font-black uppercase tracking-widest mb-1">Curso</p>
+                                      <h3 className="text-white font-black text-lg uppercase italic">{course.title}</h3>
+                                    </div>
+                                    <div className="text-right"><span className="text-slate-400 text-xs font-bold">{courseCompleted}/{courseLessons.length} aulas · {coursePercent}%</span></div>
+                                  </div>
+                                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mt-4"><div className="h-full bg-brand-primary rounded-full" style={{ width: `${coursePercent}%` }} /></div>
+                                </div>
+
+                                <div className="divide-y divide-white/5">
+                                  {course.modules.map(module => {
+                                    const moduleCompleted = module.lessons.filter(lesson => lesson.is_completed).length;
+                                    const modulePercent = module.lessons.length > 0 ? Math.round((moduleCompleted / module.lessons.length) * 100) : 0;
+
+                                    return (
+                                      <div key={module.id} className="p-5 md:p-6">
+                                        <div className="flex items-center justify-between gap-4 mb-4">
+                                          <div>
+                                            <p className="text-slate-600 text-[9px] font-black uppercase tracking-widest">Módulo</p>
+                                            <h4 className="text-slate-200 font-black uppercase italic text-sm">{module.title}</h4>
+                                          </div>
+                                          <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{moduleCompleted}/{module.lessons.length} · {modulePercent}%</span>
+                                        </div>
+
+                                        {module.lessons.length === 0 ? (
+                                          <p className="text-slate-600 text-xs italic">Nenhuma aula cadastrada.</p>
+                                        ) : (
+                                          <div className="space-y-2">
+                                            {module.lessons.map((lesson, index) => (
+                                              <div key={lesson.id} className={`flex items-center justify-between gap-4 p-3 rounded-xl border ${lesson.is_completed ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-white/[0.02] border-white/5'}`}>
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0 ${lesson.is_completed ? 'bg-emerald-500/15 text-emerald-400' : 'bg-white/5 text-slate-600'}`}>
+                                                    {lesson.is_completed ? <CheckCircle2 size={16} /> : <span className="text-[10px] font-black">{index + 1}</span>}
+                                                  </div>
+                                                  <div className="min-w-0">
+                                                    <p className={`text-xs md:text-sm font-bold truncate ${lesson.is_completed ? 'text-slate-300' : 'text-slate-500'}`}>{lesson.title}</p>
+                                                    <p className={`text-[9px] uppercase font-black tracking-widest mt-0.5 ${lesson.is_completed ? 'text-emerald-500' : 'text-slate-700'}`}>
+                                                      {lesson.is_completed ? `Confirmada${lesson.completed_at ? ` · ${formatDate(lesson.completed_at)}` : ''}` : 'Pendente'}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                                <span className={`text-[9px] font-black uppercase tracking-widest flex-shrink-0 ${lesson.is_completed ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                                  {lesson.is_completed ? 'Concluída' : 'Falta fazer'}
+                                                </span>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+""" + marker
+          if marker not in text:
+              raise SystemExit("settings marker not found")
+          text = text.replace(marker, modal, 1)
+
+          path.write_text(text)
+          print("Student progress feature applied successfully.")
+
+      - name: Commit changes and remove temporary workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/app/dashboard/admin/page.tsx
+          git rm .github/workflows/apply-student-progress.yml
+          git commit -m "feat(admin): show student lesson progress"
+          git push
