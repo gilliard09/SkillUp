@@ -46,7 +46,7 @@ export default function DashboardPage(){
    })))??[];
    const done=new Set(completedIds); const first=all.find((x:any)=>!done.has(x.id)); setResume((first as Lesson)??null); setProgress(all.length?Math.round(done.size/all.length*100):0);
    const acts=activities.data??[]; setStats({lessons:acts.filter(x=>x.activity_type==='lesson').length,quizzes:acts.filter(x=>x.activity_type==='quiz').length,challenges:acts.filter(x=>x.activity_type==='challenge').length,projects:projects.data?.length??0});
- }catch(e){console.error(e)}finally{setLoading(false)}})()},[router,oldXp]);
+ }catch(e){console.error(e)}finally{setLoading(false)}})()},[router]);
  const xp=profile?.xp??0, cur=level(xp), nxt=next(xp), streak=profile?.streak??0;
  if(loading)return <div className="min-h-screen flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-brand-primary" size={40}/></div>;
  return <div className="min-h-screen pb-24 relative overflow-hidden"><div className="fixed -top-32 right-0 w-[500px] h-[500px] bg-brand-primary/10 blur-[120px] rounded-full pointer-events-none"/><LevelUpModal isOpen={showLevelUp} onClose={()=>setShowLevelUp(false)} levelData={cur}/>
