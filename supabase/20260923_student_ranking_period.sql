@@ -17,13 +17,13 @@ declare
   v_user uuid := auth.uid();
   v_org uuid;
   v_days integer := greatest(1, least(coalesce(p_period_days, 28), 365));
+  v_start timestamptz;
 begin
   if v_user is null then
     raise exception 'Não autenticado';
   end if;
 
-  select organization_id
-    into v_org
+  select organization_id into v_org
   from public.profiles
   where id = v_user;
 
@@ -31,44 +31,40 @@ begin
     raise exception 'Aluno sem organização';
   end if;
 
+  v_start := case
+    when v_days = 7 then date_trunc('week', now())
+    else now() - make_interval(days => v_days)
+  end;
+
   return query
   with period_scores as (
     select
       p.id as user_id,
       p.full_name,
-      coalesce(sum(la.xp_earned), 0)::bigint as period_xp,
+      sum(la.xp_earned)::bigint as period_xp,
       coalesce(p.xp, 0)::integer as total_xp
     from public.profiles p
-    left join public.learning_activity la
+    join public.learning_activity la
       on la.user_id = p.id
-     and la.created_at >= case
-       when v_days = 7 then date_trunc('week', now())
-       else now() - make_interval(days => v_days)
-     end
+     and la.created_at >= v_start
+     and la.xp_earned > 0
     where p.organization_id = v_org
-      and exists (
-        select 1
-        from public.learning_activity active
-        where active.user_id = p.id
-          and active.created_at >= now() - make_interval(days => v_days)
-          and active.xp_earned > 0
-      )
     group by p.id, p.full_name, p.xp
   ),
   ranked as (
     select
       ps.*,
-      rank() over (order by ps.period_xp desc, ps.total_xp desc, ps.full_name asc) as ranking_position
+      rank() over (
+        order by ps.period_xp desc, ps.total_xp desc, ps.full_name asc
+      ) as ranking_position
     from period_scores ps
   ),
   top_ten as (
-    select *
-    from ranked
+    select * from ranked
     where ranking_position <= 10
   ),
   current_user_row as (
-    select *
-    from ranked
+    select * from ranked
     where user_id = v_user
       and ranking_position > 10
   )
