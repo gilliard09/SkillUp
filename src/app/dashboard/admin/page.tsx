@@ -86,6 +86,12 @@ type ProgressLesson = {
   completed_at: string | null;
 };
 
+type StudentLessonProgress = {
+  lesson_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+};
+
 type ProgressModule = {
   id: string;
   title: string;
@@ -461,7 +467,7 @@ export default function AdminPage() {
       if (progressRes.error) throw progressRes.error;
 
       const confirmedByLesson = new Map(
-        (progressRes.data ?? []).map(progress => [
+        ((progressRes.data ?? []) as StudentLessonProgress[]).map(progress => [
           progress.lesson_id,
           { is_completed: true, completed_at: progress.completed_at },
         ])
