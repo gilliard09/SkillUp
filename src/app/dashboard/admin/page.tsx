@@ -410,8 +410,8 @@ export default function AdminPage() {
     if (!search) return true;
 
     return (
-      student.full_name.toLocaleLowerCase('pt-BR').includes(search) ||
-      student.email.toLocaleLowerCase('pt-BR').includes(search)
+      (student.full_name ?? '').toLocaleLowerCase('pt-BR').includes(search) ||
+      (student.email ?? '').toLocaleLowerCase('pt-BR').includes(search)
     );
   });
 
