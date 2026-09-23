@@ -373,7 +373,9 @@ export default function AdminPage() {
           const userEnrollments = allEnrollments?.filter(e => e.user_id === profile.id) || [];
           
           const userCourses = userEnrollments.map((enrollment) => {
-            const foundCourse = allCourses?.find(course => course.id === enrollment.product_id);
+            const foundCourse = allCourses?.find(
+  course => String(course.id) === String(enrollment.product_id)
+);
             return foundCourse ? { id: foundCourse.id, title: foundCourse.title } : null;
           }).filter(Boolean);
 
@@ -426,7 +428,7 @@ export default function AdminPage() {
           .from('courses')
           .select('id, title')
           .eq('organization_id', adminOrgId)
-          .in('id', courseIds)
+          .in('id', courseIds.map(String))
           .order('title'),
         supabase
           .from('modules')
