@@ -89,7 +89,7 @@ export default function RankingPage() {
 
       if (data) setTopUsers(data as RankUser[]);
 
-      if (currentUser?.id) {
+      if (currentId) {
         const { count } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
@@ -112,7 +112,7 @@ export default function RankingPage() {
         full_name: row.full_name,
         xp: Number(row.period_xp ?? 0),
       })));
-      const mine = rows.find(row => row.user_id === currentUser?.id);
+      const mine = rows.find(row => row.user_id === currentId);
       setMyPosition(mine ? Number(mine.position) : null);
     }
   }, []);
