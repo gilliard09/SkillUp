@@ -75,7 +75,7 @@ begin
   select * from top_ten
   union all
   select * from current_user_row
-  order by position;
+  order by ranking_position;
 end;
 $$;
 
