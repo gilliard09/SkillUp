@@ -200,7 +200,7 @@ export default function LessonDetailsPage() {
         isOpen={showValidation}
         onClose={() => setShowValidation(false)}
         onSuccess={(result) => { setIsDone(true); notify('success', `+${result?.xp_earned ?? 0} XP conquistado!`); }}
-        lessonId={lessonId}
+        lessonId={lessonId ?? lesson.id}
       />
 
       {/* Toast */}
