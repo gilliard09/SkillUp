@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { ArrowRight, BookOpen, Flame, Loader2, Trophy, Target, FolderKanban, Bell, Zap } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
 import { DashboardHeader } from '@/components/dashboard/header';
 const LevelUpModal = dynamic(
   () => import('@/components/dashboard/levelupmodal').then((mod) => mod.LevelUpModal),
@@ -28,11 +29,10 @@ type Course={id:string;title:string;description:string|null;image_url:string|nul
 type Lesson={id:string;title:string;module_id:string;modules:{course_id:string;title:string}[]|null};
 
 export default function DashboardPage(){
- const router=useRouter(); const [profile,setProfile]=useState<any>(null); const [courses,setCourses]=useState<Course[]>([]); const [resume,setResume]=useState<Lesson|null>(null); const [progress,setProgress]=useState(0); const [stats,setStats]=useState({lessons:0,quizzes:0,challenges:0,projects:0}); const [unread,setUnread]=useState(0); const [loading,setLoading]=useState(true); const [showLevelUp,setShowLevelUp]=useState(false);
- useEffect(()=>{ (async()=>{ const {data:{user}}=await supabase.auth.getUser(); if(!user){router.push('/login');return;} try{
-   const [pr,en]=await Promise.all([supabase.from('profiles').select('full_name,xp,streak,last_practice_date,organization_id').eq('id',user.id).maybeSingle(),supabase.from('enrollments').select('product_id').eq('user_id',user.id)]);
-   const p=pr.data; if(p){setProfile(p)}
-   const ids=en.data?.map(x=>x.product_id)??[]; if(!ids.length){setLoading(false);return;}
+ const router=useRouter(); const { user, profile: sharedProfile, loading: userLoading } = useDashboardUser(); const [courses,setCourses]=useState<Course[]>([]); const [resume,setResume]=useState<Lesson|null>(null); const [progress,setProgress]=useState(0); const [stats,setStats]=useState({lessons:0,quizzes:0,challenges:0,projects:0}); const [unread,setUnread]=useState(0); const [loading,setLoading]=useState(true); const [showLevelUp,setShowLevelUp]=useState(false);
+ useEffect(()=>{ if(!user || userLoading) return; (async()=>{ try{
+   const idsRes=await supabase.from('enrollments').select('product_id').eq('user_id',user.id);
+   const ids=idsRes.data?.map(x=>x.product_id)??[]; if(!ids.length){setLoading(false);return;}
    const [cr,mods,completed,activities,projects,notifs]=await Promise.all([
     supabase.from('courses').select('id,title,description,image_url,category').in('id',ids).order('title'),
     supabase.from('modules').select('id,course_id,title,lessons(id,title,module_id)').in('course_id',ids).order('order_index'),
@@ -49,8 +49,8 @@ export default function DashboardPage(){
    })))??[];
    const done=new Set(completedIds); const first=all.find((x:any)=>!done.has(x.id)); setResume((first as Lesson)??null); setProgress(all.length?Math.round(done.size/all.length*100):0);
    const acts=activities.data??[]; setStats({lessons:acts.filter(x=>x.activity_type==='lesson').length,quizzes:acts.filter(x=>x.activity_type==='quiz').length,challenges:acts.filter(x=>x.activity_type==='challenge').length,projects:projects.data?.length??0});
- }catch(e){console.error(e)}finally{setLoading(false)}})()},[router]);
- const xp=profile?.xp??0, cur=level(xp), nxt=next(xp), streak=profile?.streak??0;
+ }catch(e){console.error(e)}finally{setLoading(false)}})()},[user,userLoading]);
+ const profile=sharedProfile; const xp=profile?.xp??0, cur=level(xp), nxt=next(xp), streak=profile?.streak??0;
  if(loading)return <div className="min-h-screen flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-brand-primary" size={40}/></div>;
  return <div className="min-h-screen pb-24 relative overflow-hidden"><div className="fixed -top-32 right-0 w-[500px] h-[500px] bg-brand-primary/10 blur-[120px] rounded-full pointer-events-none"/><LevelUpModal isOpen={showLevelUp} onClose={()=>setShowLevelUp(false)} levelData={cur}/>
   <DashboardHeader userName={profile?.full_name?.split(' ')[0]??'Explorador'} level={cur.name} xp={xp} progress={progress}/>
