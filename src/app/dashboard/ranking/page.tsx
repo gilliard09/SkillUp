@@ -113,7 +113,7 @@ export default function RankingPage() {
         xp: Number(row.period_xp ?? 0),
       })));
       const mine = rows.find(row => row.user_id === currentId);
-      setMyPosition(mine ? Number(mine.position) : null);
+      setMyPosition(mine ? Number(mine.ranking_position) : null);
     }
   }, []);
 
