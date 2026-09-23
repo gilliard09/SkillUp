@@ -7,7 +7,7 @@ returns table (
   full_name text,
   period_xp bigint,
   total_xp integer,
-  position bigint
+  ranking_position bigint
 )
 language plpgsql
 security definer
@@ -58,19 +58,19 @@ begin
   ranked as (
     select
       ps.*,
-      rank() over (order by ps.period_xp desc, ps.total_xp desc, ps.full_name asc) as position
+      rank() over (order by ps.period_xp desc, ps.total_xp desc, ps.full_name asc) as ranking_position
     from period_scores ps
   ),
   top_ten as (
     select *
     from ranked
-    where position <= 10
+    where ranking_position <= 10
   ),
   current_user_row as (
     select *
     from ranked
     where user_id = v_user
-      and position > 10
+      and ranking_position > 10
   )
   select * from top_ten
   union all
