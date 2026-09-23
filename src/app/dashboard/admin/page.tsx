@@ -427,7 +427,6 @@ export default function AdminPage() {
         supabase
           .from('courses')
           .select('id, title')
-          .eq('organization_id', adminOrgId)
           .in('id', courseIds.map(String))
           .order('title'),
         supabase
