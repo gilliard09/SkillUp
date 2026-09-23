@@ -21,7 +21,6 @@ type Question = {
   id: string;
   question_text: string;
   options: string[];
-  correct_option_index: number;
 };
 
 type Quiz = {
@@ -97,7 +96,7 @@ export default function LessonQuizPage() {
 
         const { data: questionsData } = await supabase
           .from('questions')
-          .select('id, question_text, options, correct_option_index')
+          .select('id, question_text, options')
           .eq('quiz_id', quizRes.data.id)
           .order('id');
 
@@ -117,10 +116,11 @@ export default function LessonQuizPage() {
   // ----------------------------------------------------------
   // CONFIRMAR RESPOSTA
   // ----------------------------------------------------------
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+
   const handleAnswer = () => {
     if (selectedOption === null) return;
-    const isCorrect = selectedOption === questions[currentQuestionIndex].correct_option_index;
-    if (isCorrect) setScore(prev => prev + 1);
+    setAnswers(prev => ({ ...prev, [questions[currentQuestionIndex].id]: selectedOption }));
     setIsAnswered(true);
   };
 
@@ -142,41 +142,12 @@ export default function LessonQuizPage() {
     try {
       if (!userId || !lessonId) return;
 
-      const xpPerQuestion = quiz?.xp_per_question ?? DEFAULT_XP_PER_QUESTION;
-      const totalXP       = score * xpPerQuestion;
-
-      // 1. Verifica se já tem progresso (proteção contra XP duplo por repetição)
-      const { data: existingProgress } = await supabase
-        .from('lesson_progress')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('lesson_id', lessonId)
-        .maybeSingle();
-
-      if (!existingProgress) {
-        // 2. Marca a aula como concluída
-        await supabase
-          .from('lesson_progress')
-          .upsert(
-            { user_id: userId, lesson_id: lessonId, is_completed: true },
-            { onConflict: 'user_id,lesson_id' }
-          );
-
-        // 3. Soma XP apenas se acertou pelo menos uma
-        if (totalXP > 0) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('xp')
-            .eq('id', userId)
-            .single();
-
-          await supabase
-            .from('profiles')
-            .update({ xp: (profile?.xp ?? 0) + totalXP })
-            .eq('id', userId);
-        }
-      }
-
+      const { data, error } = await supabase.rpc('submit_quiz_secure', {
+        p_lesson_id: lessonId,
+        p_answers: answers,
+      });
+      if (error) throw error;
+      setScore(data?.score ?? 0);
       setQuizFinished(true);
       router.refresh();
     } catch (err) {
@@ -299,7 +270,7 @@ export default function LessonQuizPage() {
 
           <div className="space-y-4">
             {currentQ.options.map((option, i) => {
-              const isCorrect  = i === currentQ.correct_option_index;
+              const isCorrect  = false;
               const isSelected = selectedOption === i;
 
               let borderColor = 'border-white/10';

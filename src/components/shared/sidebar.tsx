@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap } from 'lucide-react';
+import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
@@ -15,11 +15,15 @@ type NavItem = {
 };
 
 const BASE_ITEMS: NavItem[] = [
-  { icon: LayoutDashboard, label: 'Início',    href: '/dashboard' },
-  { icon: Zap,             label: 'Baú de Prompts', href: '/dashboard/sequencia', isSequencia: true },
-  { icon: Sword,           label: 'Desafios',  href: '/dashboard/challenges' },
-  { icon: Trophy,          label: 'Ranking',   href: '/dashboard/ranking' },
-  { icon: User,            label: 'Perfil',    href: '/dashboard/profile' },
+  { icon: LayoutDashboard, label: 'Início', href: '/dashboard' },
+  { icon: Compass, label: 'Minha Jornada', href: '/dashboard/jornada' },
+  { icon: Zap, label: 'Baú de Prompts', href: '/dashboard/sequencia', isSequencia: true },
+  { icon: Sword, label: 'Desafios', href: '/dashboard/challenges' },
+  { icon: FolderKanban, label: 'Meus Projetos', href: '/dashboard/projects' },
+  { icon: Trophy, label: 'Ranking', href: '/dashboard/ranking' },
+  { icon: Award, label: 'Conquistas', href: '/dashboard/achievements' },
+  { icon: Bell, label: 'Notificações', href: '/dashboard/notifications' },
+  { icon: User, label: 'Perfil', href: '/dashboard/profile' },
 ];
 
 const ADMIN_ITEM: NavItem = {

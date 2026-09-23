@@ -154,58 +154,7 @@ export default function LessonDetailsPage() {
   // ----------------------------------------------------------
   const handleCompleteLesson = async () => {
     if (isDone || isCompleting) return;
-
-    try {
-      setIsCompleting(true);
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { router.push('/login'); return; }
-
-      // Proteção dupla contra XP duplicado
-      const { data: existingProgress } = await supabase
-        .from('lesson_progress')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('lesson_id', lessonId)
-        .maybeSingle();
-
-      if (existingProgress) { setIsDone(true); return; }
-
-      // Registra progresso
-      const { error: progressError } = await supabase
-        .from('lesson_progress')
-        .insert({ user_id: user.id, lesson_id: lessonId, is_completed: true });
-
-      if (progressError) throw progressError;
-
-      // Atualiza XP
-      const xpReward = lesson?.xp_reward ?? 0;
-      if (xpReward > 0) {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('xp')
-          .eq('id', user.id)
-          .single();
-
-        if (profileError) throw profileError;
-
-        const { error: xpError } = await supabase
-          .from('profiles')
-          .update({ xp: (profile?.xp ?? 0) + xpReward })
-          .eq('id', user.id);
-
-        if (xpError) throw xpError;
-      }
-
-      setIsDone(true);
-      notify('success', `+${xpReward} XP conquistado!`);
-
-    } catch (err: any) {
-      console.error('Erro ao concluir aula:', err.message);
-      notify('error', 'Erro ao salvar progresso. Verifique sua conexão.');
-    } finally {
-      setIsCompleting(false);
-    }
+    setShowValidation(true);
   };
 
   // ----------------------------------------------------------
@@ -250,7 +199,8 @@ export default function LessonDetailsPage() {
       <ValidationModal
         isOpen={showValidation}
         onClose={() => setShowValidation(false)}
-        onSuccess={handleCompleteLesson}
+        onSuccess={(result) => { setIsDone(true); notify('success', `+${result?.xp_earned ?? 0} XP conquistado!`); }}
+        lessonId={lessonId}
       />
 
       {/* Toast */}

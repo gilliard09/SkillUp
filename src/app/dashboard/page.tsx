@@ -1,388 +1,57 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { ArrowRight, BookOpen, Flame, Loader2, Trophy, Target, FolderKanban, Bell, Zap } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { DashboardHeader } from '@/components/dashboard/header';
 import { LevelUpModal } from '@/components/dashboard/levelupmodal';
-import { PlayCircle, Loader2, Zap, LayoutGrid, Trophy } from 'lucide-react';
-import Image from 'next/image';
-import Link from 'next/link';
 
-// ============================================================
-// TIPOS
-// ============================================================
-type Course = {
-  id: string;
-  title: string;
-  description: string | null;
-  image_url: string | null;
-  category: string | null;
-  price: number | null;
-};
-
-type Profile = {
-  full_name: string | null;
-  xp: number;
-  streak: number;
-  last_practice_date: string | null;
-  organization_id: string | null;
-};
-
-type Level = {
-  min: number;
-  name: string;
-  color: string;
-  bg: string;
-  border: string;
-};
-
-// ============================================================
-// CONSTANTES
-// ============================================================
-const LEVELS: Level[] = [
-  { min: 5000, name: 'Lendário Digital',       color: 'text-purple-400',    bg: 'bg-purple-400/10',    border: 'border-purple-400/20'    },
-  { min: 4000, name: 'Mestre Tech',             color: 'text-orange-400',    bg: 'bg-orange-400/10',    border: 'border-orange-400/20'    },
-  { min: 3000, name: 'Especialista Digital',    color: 'text-blue-400',      bg: 'bg-blue-400/10',      border: 'border-blue-400/20'      },
-  { min: 2000, name: 'Criador de Soluções',     color: 'text-emerald-400',   bg: 'bg-emerald-400/10',   border: 'border-emerald-400/20'   },
-  { min: 1000, name: 'Desenvolvedor Iniciante', color: 'text-brand-primary', bg: 'bg-brand-primary/10', border: 'border-brand-primary/20' },
-  { min: 0,    name: 'Explorador Digital',      color: 'text-slate-400',     bg: 'bg-slate-400/10',     border: 'border-white/5'          },
+const LEVELS = [
+  { min: 5000, name: 'Lendário Digital', color: 'text-purple-400', bg:'bg-purple-400/10', border:'border-purple-400/20' },
+  { min: 4000, name: 'Mestre Tech', color: 'text-orange-400', bg:'bg-orange-400/10', border:'border-orange-400/20' },
+  { min: 3000, name: 'Especialista Digital', color: 'text-blue-400', bg:'bg-blue-400/10', border:'border-blue-400/20' },
+  { min: 2000, name: 'Criador de Soluções', color: 'text-emerald-400', bg:'bg-emerald-400/10', border:'border-emerald-400/20' },
+  { min: 1000, name: 'Desenvolvedor Iniciante', color: 'text-brand-primary', bg:'bg-brand-primary/10', border:'border-brand-primary/20' },
+  { min: 0, name: 'Explorador Digital', color: 'text-slate-400', bg:'bg-slate-400/10', border:'border-white/5' },
 ];
+const level = (xp:number) => LEVELS.find(x=>xp>=x.min) ?? LEVELS.at(-1)!;
+const next = (xp:number) => [...LEVELS].reverse().find(x=>x.min>xp) ?? null;
 
-function getCurrentLevel(xp: number): Level {
-  return LEVELS.find(l => xp >= l.min) ?? LEVELS[LEVELS.length - 1];
-}
+type Course={id:string;title:string;description:string|null;image_url:string|null;category:string|null};
+type Lesson={id:string;title:string;module_id:string;modules:{course_id:string;title:string}|null};
 
-function getNextLevel(xp: number): Level | null {
-  return [...LEVELS].reverse().find(l => l.min > xp) ?? null;
-}
-
-function practicedToday(lastDate: string | null): boolean {
-  if (!lastDate) return false;
-  return new Date(lastDate).toDateString() === new Date().toDateString();
-}
-
-// ============================================================
-// COMPONENTE CARD DE SEQUÊNCIA
-// ============================================================
-function SequenciaCard({ streak, practicedToday: doneToday }: { streak: number; practicedToday: boolean }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 }}
-      className="mb-10"
-    >
-      <Link href="/dashboard/sequencia">
-        <div className={`relative overflow-hidden rounded-[2rem] border p-6 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer ${
-          doneToday
-            ? 'bg-[#4A2080]/15 border-[#4A2080]/30'
-            : 'bg-slate-900/60 border-white/10'
-        }`}>
-
-          {doneToday && (
-            <div className="absolute inset-0 bg-[#4A2080]/10 blur-2xl -z-10 rounded-[2rem]" />
-          )}
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className={`h-14 w-14 rounded-[1.25rem] flex items-center justify-center shadow-lg flex-shrink-0 ${
-                doneToday
-                  ? 'bg-[#4A2080] shadow-[0_0_20px_rgba(74,32,128,0.4)]'
-                  : 'bg-slate-800 border border-white/10'
-              }`}>
-                <Zap
-                  size={28}
-                  className={doneToday ? 'text-white' : 'text-slate-500'}
-                  fill={doneToday ? 'white' : 'none'}
-                />
-              </div>
-
-              <div>
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">
-                  Sequência
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className={`text-3xl font-black italic ${
-                    doneToday ? 'text-[#7B4FBF]' : 'text-slate-400'
-                  }`}>
-                    {streak}
-                  </span>
-                  <span className="text-slate-500 text-sm font-bold uppercase tracking-widest">
-                    {streak === 1 ? 'dia' : 'dias'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="text-right">
-              {doneToday ? (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-black text-[#7B4FBF] uppercase tracking-widest">
-                    Completo hoje ⚡
-                  </span>
-                  <span className="text-slate-600 text-[9px] font-bold uppercase">
-                    Volte amanhã
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-end gap-1">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                    Acesse o Baú de Prompts
-                  </span>
-                  <span className="text-brand-primary text-[9px] font-black uppercase tracking-wider">
-                    clique e resgate o prompt do dia →
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-5 flex gap-2">
-            {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, i) => {
-              const today = new Date().getDay();
-              const isPast   = i < today;
-              const isToday  = i === today;
-              const isFuture = i > today;
-              return (
-                <div key={i} className="flex-1 flex flex-col items-center gap-1.5">
-                  <div className={`w-full h-1.5 rounded-full ${
-                    isToday && doneToday
-                      ? 'bg-[#4A2080]'
-                      : isToday
-                      ? 'bg-white/20'
-                      : isPast && streak > (today - i)
-                      ? 'bg-[#4A2080]/60'
-                      : isFuture
-                      ? 'bg-white/5'
-                      : 'bg-white/10'
-                  }`} />
-                  <span className={`text-[8px] font-black uppercase ${
-                    isToday ? 'text-white' : 'text-slate-700'
-                  }`}>{day}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </Link>
-    </motion.div>
-  );
-}
-// ============================================================
-// PÁGINA PRINCIPAL
-// ============================================================
-export default function DashboardPage() {
-  const router = useRouter();
-
-  const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
-  const [profile, setProfile]                 = useState<Profile | null>(null);
-  const [loading, setLoading]                 = useState(true);
-  const [showLevelUp, setShowLevelUp]         = useState(false);
-  const [globalProgress, setGlobalProgress]   = useState(0);
-  const [previousXp, setPreviousXp]           = useState<number | null>(null);
-
-  const xp           = profile?.xp ?? 0;
-  const streak       = profile?.streak ?? 0;
-  const doneToday    = practicedToday(profile?.last_practice_date ?? null);
-  const currentLevel = useMemo(() => getCurrentLevel(xp), [xp]);
-  const nextLevel    = useMemo(() => getNextLevel(xp), [xp]);
-  const xpToNext     = nextLevel ? nextLevel.min - xp : 0;
-
-  useEffect(() => {
-    async function fetchDashboardData() {
-      try {
-        setLoading(true);
-
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { router.push('/login'); return; }
-
-        const [profileRes, enrollmentsRes] = await Promise.all([
-          supabase
-            .from('profiles')
-            .select('full_name, xp, streak, last_practice_date, organization_id')
-            .eq('id', user.id)
-            .maybeSingle(),
-          supabase.from('enrollments').select('product_id').eq('user_id', user.id),
-        ]);
-
-        const profileData = profileRes.data as Profile | null;
-        if (profileData) {
-          if (previousXp !== null) {
-            const prevLevel = getCurrentLevel(previousXp);
-            const newLevel  = getCurrentLevel(profileData.xp ?? 0);
-            if (newLevel.min > prevLevel.min) setShowLevelUp(true);
-          }
-          setPreviousXp(profileData.xp ?? 0);
-          setProfile(profileData);
-        }
-
-        const enrolledIds = enrollmentsRes.data?.map(e => e.product_id) ?? [];
-
-        if (enrolledIds.length > 0) {
-          const { data: coursesData } = await supabase
-            .from('courses')
-            .select('*')
-            .in('id', enrolledIds)
-            .order('title', { ascending: true });
-
-          setEnrolledCourses((coursesData as Course[]) ?? []);
-
-          const { data: modulesData } = await supabase
-            .from('modules')
-            .select('id')
-            .in('course_id', enrolledIds);
-
-          const moduleIds = modulesData?.map(m => m.id) ?? [];
-
-          if (moduleIds.length > 0) {
-            const [allLessonsRes, completedRes] = await Promise.all([
-              supabase.from('lessons').select('id').in('module_id', moduleIds),
-              supabase
-                .from('lesson_progress')
-                .select('lesson_id')
-                .eq('user_id', user.id)
-                .eq('is_completed', true),
-            ]);
-
-            const total     = allLessonsRes.data?.length ?? 0;
-            const completed = completedRes.data?.length ?? 0;
-            if (total > 0) setGlobalProgress(Math.round((completed / total) * 100));
-          }
-        } else {
-          setEnrolledCourses([]);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dashboard:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchDashboardData();
-  }, [router, previousXp]);
-
-  const categories = useMemo(
-    () => Array.from(new Set(enrolledCourses.map(c => c.category ?? 'Geral'))),
-    [enrolledCourses]
-  );
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-brand-primary bg-slate-950">
-        <Loader2 className="animate-spin" size={40} />
-      </div>
-    );
-  }
-
-  return (
-    <div className="pb-24 overflow-hidden relative font-sans bg-slate-950 min-h-screen">
-      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-brand-primary/10 blur-[120px] -z-10 rounded-full pointer-events-none" />
-      <div className="fixed bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/10 blur-[120px] -z-10 rounded-full pointer-events-none" />
-
-      <LevelUpModal
-        isOpen={showLevelUp}
-        onClose={() => setShowLevelUp(false)}
-        levelData={currentLevel}
-      />
-
-      <DashboardHeader
-        userName={profile?.full_name?.split(' ')[0] ?? 'Explorador'}
-        level={currentLevel.name}
-        xp={xp}
-        progress={globalProgress}
-      />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        {nextLevel && (
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="mb-8 -mt-8 flex items-center gap-4 bg-slate-900/60 border border-white/10 p-2 pr-6 rounded-full backdrop-blur-md w-fit shadow-xl"
-          >
-            <div className={`h-10 w-10 rounded-full ${nextLevel.bg} flex items-center justify-center ${nextLevel.color} shadow-lg`}>
-              <Zap size={18} fill="currentColor" />
-            </div>
-            <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-tight">
-              Faltam{' '}
-              <span className="text-white font-black">{xpToNext} XP</span>
-              {' '}para{' '}
-              <span className={`${nextLevel.color} italic underline decoration-2`}>
-                {nextLevel.name}
-              </span>
-            </p>
-          </motion.div>
-        )}
-
-        <SequenciaCard streak={streak} practicedToday={doneToday} />
-        
-       
-        {enrolledCourses.length === 0 ? (
-          <div className="max-w-md mx-auto text-center py-24 bg-slate-900/40 rounded-[3rem] border border-dashed border-white/10 px-8 mt-12">
-            <LayoutGrid size={32} className="text-slate-600 mx-auto mb-6" />
-            <h4 className="text-white font-black uppercase italic mb-2">Nenhum curso encontrado</h4>
-            <p className="text-slate-500 text-sm font-medium">
-              Você ainda não está matriculado em nenhum curso.
-            </p>
-          </div>
-        ) : (
-          categories.map((category) => (
-            <section key={category} className="mb-20">
-              <div className="flex items-center gap-4 mb-10">
-                <div className="h-10 w-2 bg-gradient-to-b from-brand-primary to-orange-600 rounded-full shadow-[0_0_15px_rgba(255,107,0,0.4)]" />
-                <h2 className="text-3xl font-black text-white uppercase italic tracking-tighter">{category}</h2>
-                <div className="h-[1px] flex-grow bg-white/5 ml-4" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {enrolledCourses
-                  .filter(c => (c.category ?? 'Geral') === category)
-                  .map((course) => (
-                    <motion.div
-                      key={course.id}
-                      whileHover={{ y: -6, scale: 1.01 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                      className="group relative rounded-[2.5rem] overflow-hidden h-72 shadow-2xl"
-                    >
-                      <div className="absolute inset-0 z-0">
-                        <Image
-                          src={course.image_url ?? '/placeholder-course.png'}
-                          alt={course.title}
-                          fill
-                          className="object-cover transition-transform duration-700 group-hover:scale-105 brightness-50"
-                          sizes="(max-width: 768px) 100vw, 50vw"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/70 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-slate-950/60 via-transparent to-transparent" />
-                        <div className="absolute inset-0 bg-brand-primary/0 group-hover:bg-brand-primary/5 transition-all duration-500" />
-                      </div>
-
-                      <div className="relative z-10 p-8 flex flex-col justify-end h-full w-full">
-                        <span className="px-2 py-0.5 rounded-md bg-brand-primary/20 text-brand-primary text-[10px] font-black uppercase tracking-widest italic border border-brand-primary/30 w-fit mb-3">
-                          Disponível
-                        </span>
-                        <h3 className="text-2xl font-black text-white mb-2 italic uppercase tracking-tighter leading-tight group-hover:text-brand-primary transition-colors drop-shadow-lg">
-                          {course.title}
-                        </h3>
-                        <p className="text-slate-300/70 text-xs font-medium leading-relaxed line-clamp-2 mb-6">
-                          {course.description}
-                        </p>
-                        <Link
-                          href={`/dashboard/courses/${course.id}`}
-                          className="flex items-center justify-center gap-2 w-full bg-white/10 backdrop-blur-md border border-white/20 text-white font-black py-4 px-4 rounded-2xl hover:bg-brand-primary hover:border-brand-primary transition-all duration-300 active:scale-95 group/btn uppercase italic tracking-normal text-xs text-center shadow-lg whitespace-nowrap"
-                        >
-                          Continuar de onde parou
-                          <PlayCircle size={16} className="flex-shrink-0 group-hover/btn:rotate-12 transition-transform" />
-                        </Link>
-                      </div>
-                    </motion.div>
-                  ))}
-              </div>
-            </section>
-          ))
-        )}
-      </div>
-    </div>
-  );
+export default function DashboardPage(){
+ const router=useRouter(); const [profile,setProfile]=useState<any>(null); const [courses,setCourses]=useState<Course[]>([]); const [resume,setResume]=useState<Lesson|null>(null); const [progress,setProgress]=useState(0); const [stats,setStats]=useState({lessons:0,quizzes:0,challenges:0,projects:0}); const [unread,setUnread]=useState(0); const [loading,setLoading]=useState(true); const [showLevelUp,setShowLevelUp]=useState(false); const [oldXp,setOldXp]=useState<number|null>(null);
+ useEffect(()=>{ (async()=>{ const {data:{user}}=await supabase.auth.getUser(); if(!user){router.push('/login');return;} try{
+   const [pr,en]=await Promise.all([supabase.from('profiles').select('full_name,xp,streak,last_practice_date,organization_id').eq('id',user.id).maybeSingle(),supabase.from('enrollments').select('product_id').eq('user_id',user.id)]);
+   const p=pr.data; if(p){if(oldXp!==null&&level(p.xp).min>level(oldXp).min)setShowLevelUp(true);setOldXp(p.xp);setProfile(p)}
+   const ids=en.data?.map(x=>x.product_id)??[]; if(!ids.length){setLoading(false);return;}
+   const [cr,mods,completed,activities,projects,notifs]=await Promise.all([
+    supabase.from('courses').select('id,title,description,image_url,category').in('id',ids).order('title'),
+    supabase.from('modules').select('id,course_id').in('course_id',ids),
+    supabase.from('lesson_progress').select('lesson_id').eq('user_id',user.id).eq('is_completed',true),
+    supabase.from('learning_activity').select('activity_type').eq('user_id',user.id),
+    supabase.from('student_projects').select('id').eq('user_id',user.id),
+    supabase.from('notifications').select('id').eq('user_id',user.id).is('read_at',null)
+   ]);
+   const cs=(cr.data as Course[])??[]; setCourses(cs); setUnread(notifs.data?.length??0);
+   const mids=mods.data?.map(x=>x.id)??[]; const completedIds=completed.data?.map(x=>x.lesson_id)??[];
+   if(mids.length){const {data:lessons}=await supabase.from('lessons').select('id,title,module_id,modules(course_id,title)').in('module_id',mids).order('id'); const all=lessons??[]; const done=new Set(completedIds); const first=all.find(x=>!done.has(x.id)); setResume((first as Lesson)??null); setProgress(all.length?Math.round(done.size/all.length*100):0);}
+   const acts=activities.data??[]; setStats({lessons:acts.filter(x=>x.activity_type==='lesson').length,quizzes:acts.filter(x=>x.activity_type==='quiz').length,challenges:acts.filter(x=>x.activity_type==='challenge').length,projects:projects.data?.length??0});
+ }catch(e){console.error(e)}finally{setLoading(false)}})()},[router,oldXp]);
+ const xp=profile?.xp??0, cur=level(xp), nxt=next(xp), streak=profile?.streak??0;
+ if(loading)return <div className="min-h-screen flex items-center justify-center bg-slate-950"><Loader2 className="animate-spin text-brand-primary" size={40}/></div>;
+ return <div className="min-h-screen pb-24 relative overflow-hidden"><div className="fixed -top-32 right-0 w-[500px] h-[500px] bg-brand-primary/10 blur-[120px] rounded-full pointer-events-none"/><LevelUpModal isOpen={showLevelUp} onClose={()=>setShowLevelUp(false)} levelData={cur}/>
+  <DashboardHeader userName={profile?.full_name?.split(' ')[0]??'Explorador'} level={cur.name} xp={xp} progress={progress}/>
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
+   <div className="flex items-center justify-between"><div><p className="text-slate-500 text-xs font-black uppercase tracking-widest">Sua próxima ação</p><h1 className="text-2xl md:text-3xl font-black text-white italic uppercase tracking-tight">Vamos continuar sua jornada?</h1></div><Link href="/dashboard/notifications" className="relative p-3 rounded-2xl bg-white/5 border border-white/10 text-slate-300 hover:text-white"><Bell size={20}/>{unread>0&&<span className="absolute -top-1 -right-1 min-w-5 h-5 rounded-full bg-brand-primary text-white text-[9px] font-black flex items-center justify-center">{unread}</span>}</Link></div>
+   {resume ? <motion.section initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} className="rounded-[2rem] overflow-hidden border border-white/10 bg-slate-900/70 shadow-2xl"><div className="grid md:grid-cols-[.9fr_1.1fr] min-h-[260px]"><div className="relative min-h-[180px]"><Image src={courses.find(c=>c.id===resume.modules?.course_id)?.image_url??'/placeholder-course.png'} alt="" fill className="object-cover brightness-50"/><div className="absolute inset-0 bg-gradient-to-r from-transparent to-slate-900"/></div><div className="p-7 md:p-9 flex flex-col justify-center"><p className="text-brand-primary text-[10px] font-black uppercase tracking-widest mb-2">Continue de onde parou</p><h2 className="text-2xl md:text-3xl text-white font-black uppercase italic tracking-tight">{resume.title}</h2><p className="text-slate-500 text-xs mt-2 uppercase font-bold">{resume.modules?.title}</p><div className="mt-6 flex items-center gap-4"><div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div className="h-full bg-brand-primary rounded-full" style={{width:`${progress}%`}}/></div><span className="text-white font-black text-sm">{progress}%</span></div><Link href={`/dashboard/lessons/${resume.id}`} className="mt-6 inline-flex items-center justify-center gap-2 bg-brand-primary text-white font-black uppercase italic text-xs rounded-2xl h-12 px-5 hover:opacity-90">Continuar <ArrowRight size={16}/></Link></div></div></motion.section> : <section className="rounded-[2rem] border border-dashed border-white/10 p-8 text-center bg-slate-900/40"><BookOpen className="mx-auto text-slate-600"/><p className="text-white font-black mt-3">Você concluiu tudo por enquanto.</p><p className="text-slate-500 text-sm mt-1">Explore seus cursos ou seus desafios.</p></section>}
+   <section><div className="flex items-center justify-between mb-4"><h2 className="text-lg font-black text-white uppercase italic">Sua evolução</h2>{nxt&&<span className="text-[10px] text-slate-500 font-bold uppercase">{nxt.min-xp} XP para {nxt.name}</span>}</div><div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{[[BookOpen,stats.lessons,'Aulas concluídas'],[Zap,stats.quizzes,'Quizzes'],[Target,stats.challenges,'Desafios'],[FolderKanban,stats.projects,'Projetos']].map(([I,v,l]:any)=><div key={l} className="bg-slate-900/60 border border-white/10 rounded-2xl p-5"><I size={18} className="text-brand-primary mb-4"/><p className="text-2xl font-black text-white">{v}</p><p className="text-[9px] text-slate-500 uppercase tracking-widest font-black mt-1">{l}</p></div>)}</div></section>
+   <section><div className="flex items-center justify-between mb-4"><h2 className="text-lg font-black text-white uppercase italic">Seus cursos</h2><Link href="/dashboard/jornada" className="text-brand-primary text-xs font-black uppercase">Ver jornada →</Link></div><div className="grid md:grid-cols-2 gap-4">{courses.slice(0,4).map(c=><Link href={`/dashboard/courses/${c.id}`} key={c.id} className="group relative overflow-hidden rounded-3xl h-52 border border-white/10"><Image src={c.image_url??'/placeholder-course.png'} alt={c.title} fill className="object-cover brightness-50 group-hover:scale-105 transition-transform duration-500"/><div className="absolute inset-0 bg-gradient-to-t from-slate-950 to-transparent"/><div className="absolute bottom-0 p-6"><p className="text-white text-xl font-black uppercase italic">{c.title}</p><p className="text-slate-400 text-xs mt-1 line-clamp-1">{c.description}</p></div></Link>)}</div></section>
+   <div className="grid md:grid-cols-3 gap-4"><Link href="/dashboard/challenges" className="bg-gradient-to-br from-brand-primary to-orange-600 p-6 rounded-3xl text-white"><Target/><h3 className="font-black uppercase italic text-xl mt-5">Missão da semana</h3><p className="text-white/75 text-xs mt-1">Pratique, entregue e ganhe XP.</p></Link><Link href="/dashboard/sequencia" className="bg-slate-900/70 border border-white/10 p-6 rounded-3xl"><Flame className="text-orange-400"/><p className="text-[10px] text-slate-500 uppercase font-black mt-5">Sequência</p><p className="text-3xl text-white font-black">{streak} <span className="text-sm text-slate-500">dias</span></p><p className="text-[10px] text-slate-500 mt-1">O estudo de hoje mantém sua sequência.</p></Link><Link href="/dashboard/sequencia" className="bg-slate-900/70 border border-white/10 p-6 rounded-3xl"><Zap className="text-[#7B4FBF]"/><p className="text-[10px] text-slate-500 uppercase font-black mt-5">Recurso</p><p className="text-white font-black uppercase italic text-xl">Baú de Prompts</p><p className="text-xs text-slate-500 mt-1">Ferramentas para estudar e praticar com IA.</p></Link></div>
+  </div></div>;
 }

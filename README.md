@@ -34,3 +34,15 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Upgrade do app do aluno — 27/08/2026
+
+Foi adicionada a migração `supabase/20260827_student_app_upgrade.sql`.
+
+### Antes de publicar
+1. Execute o SQL no Supabase SQL Editor.
+2. Confirme que a tabela `settings` contém a chave `validation_password` usada pelo professor.
+3. Faça `npm install` e `npm run build` localmente.
+4. Publique normalmente no Vercel.
+
+A migração cria as tabelas de atividades, conquistas, notificações e projetos e adiciona RPCs seguras para conclusão de aula, quiz e aprovação de desafios. O PIN do professor e as respostas corretas do quiz não são mais enviados ao navegador.

@@ -597,62 +597,16 @@ export default function AdminPage() {
   const handleApproveSubmission = async (submission: Submission) => {
     setApprovingId(submission.id);
     try {
-      // 1. Busca o XP atual do usuário ANTES de qualquer alteração
-      const { data: profileData, error: fetchError } = await supabase
-        .from('profiles')
-        .select('xp')
-        .eq('id', submission.user_id)
-        .single();
-
-      if (fetchError) {
-        console.error('Erro ao buscar perfil:', fetchError);
-        throw fetchError;
-      }
-
-      // 2. Calcula o novo XP (100 XP por desafio aprovado)
-      const xpGanho = 100;
-      const xpAtual = Number(profileData?.xp) || 0;
-      const novoXP = xpAtual + xpGanho;
-
-      // 3. Atualiza o XP do usuário E o status da submissão em PARALELO
-      const [updateProfileResult, updateSubmissionResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .update({ xp: novoXP })
-          .eq('id', submission.user_id),
-        supabase
-          .from('challenge_submissions')
-          .update({ status: 'approved' })
-          .eq('id', submission.id)
-      ]);
-
-      if (updateProfileResult.error) {
-        console.error('Erro ao atualizar XP:', updateProfileResult.error);
-        throw updateProfileResult.error;
-      }
-
-      if (updateSubmissionResult.error) {
-        console.error('Erro ao atualizar submissão:', updateSubmissionResult.error);
-        throw updateSubmissionResult.error;
-      }
-
-      // 4. Remove imediatamente da lista local (UX instantânea)
+      const { data, error } = await supabase.rpc('approve_challenge_secure', { p_submission_id: submission.id });
+      if (error) throw error;
       setSubmissions(prev => prev.filter(s => s.id !== submission.id));
-
-      // 5. Mostra sucesso
-      notify('success', `Aprovado! +${xpGanho} XP concedido ao aluno.`);
-
-      // 6. Recarrega dados completos em background
+      notify('success', `Aprovado! +${data?.xp_earned ?? 0} XP concedido ao aluno.`);
       await loadData();
-
     } catch (err: any) {
       console.error('Erro na aprovação:', err);
       notify('error', 'Erro ao aprovar submissão: ' + err.message);
-      // Em caso de erro, recarrega para garantir estado consistente
       await loadData();
-    } finally {
-      setApprovingId(null);
-    }
+    } finally { setApprovingId(null); }
   };
 
   // ----------------------------------------------------------
