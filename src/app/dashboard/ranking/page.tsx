@@ -62,6 +62,8 @@ export default function RankingPage() {
   const [loading, setLoading]                       = useState(true);
   const [sharing, setSharing]                       = useState(false);
   const [topUsers, setTopUsers]                     = useState<RankUser[]>([]);
+  const [rankingMode, setRankingMode]               = useState<'week' | 'four_weeks' | 'general'>('four_weeks');
+  const [myPosition, setMyPosition]                 = useState<number | null>(null);
   const [currentUser, setCurrentUser]               = useState<CurrentUser | null>(null);
   const [alreadySharedToday, setAlreadySharedToday] = useState(false);
   const [message, setMessage]                       = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -74,18 +76,46 @@ export default function RankingPage() {
   // ----------------------------------------------------------
   // FETCH RANKING (Agora recebe o ID da organização)
   // ----------------------------------------------------------
-  const fetchRanking = useCallback(async (orgId: string | null) => {
+  const fetchRanking = useCallback(async (orgId: string | null, mode: 'week' | 'four_weeks' | 'general') => {
     if (!orgId) return;
 
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, full_name, xp')
-      .eq('organization_id', orgId) // NOVA MUDANÇA: Filtra pela escola
-      .order('xp', { ascending: false, nullsFirst: false })
-      .limit(10);
+    if (mode === 'general') {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, xp')
+        .eq('organization_id', orgId)
+        .order('xp', { ascending: false, nullsFirst: false })
+        .limit(10);
 
-    if (data) setTopUsers(data as RankUser[]);
-  }, []);
+      if (data) setTopUsers(data as RankUser[]);
+
+      if (currentUser?.id) {
+        const { count } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('organization_id', orgId)
+          .gt('xp', currentUser.xp ?? 0);
+        setMyPosition((count ?? 0) + 1);
+      }
+      return;
+    }
+
+    const periodDays = mode === 'week' ? 7 : 28;
+    const { data, error } = await supabase.rpc('get_student_ranking', {
+      p_period_days: periodDays,
+    });
+
+    if (!error && data) {
+      const rows = data as Array<RankUser & { period_xp: number; total_xp: number; position: number }>;
+      setTopUsers(rows.slice(0, 10).map(row => ({
+        id: row.user_id,
+        full_name: row.full_name,
+        xp: Number(row.period_xp ?? 0),
+      })));
+      const mine = rows.find(row => row.user_id === currentUser?.id);
+      setMyPosition(mine ? Number(mine.position) : null);
+    }
+  }, [currentUser?.id, currentUser?.xp]);
 
   // ----------------------------------------------------------
   // INIT
@@ -115,7 +145,7 @@ export default function RankingPage() {
           if (profile.last_share_date === today) setAlreadySharedToday(true);
 
           // 2. Busca o ranking da escola específica deste aluno
-          await fetchRanking(profile.organization_id);
+          await fetchRanking(profile.organization_id, rankingMode);
         }
       } finally {
         setLoading(false);
@@ -123,7 +153,7 @@ export default function RankingPage() {
     };
 
     init();
-  }, [fetchRanking, router]);
+  }, [fetchRanking, rankingMode, router]);
 
   // ----------------------------------------------------------
   // BÔNUS DE COMPARTILHAMENTO
@@ -160,7 +190,14 @@ export default function RankingPage() {
       setCurrentUser({ ...currentUser, xp: novoXp });
       notify('success', `Incrível! +${SHARE_XP_BONUS} XP adicionados. Volte amanhã!`);
 
-      await fetchRanking(currentUser.organization_id); // Passa o orgId para atualizar
+      if (currentUser.organization_id) {
+        await supabase.from('learning_activity').insert({
+          user_id: currentUser.id,
+          activity_type: 'project',
+          xp_earned: SHARE_XP_BONUS,
+        });
+      }
+      await fetchRanking(currentUser.organization_id, rankingMode);
       window.open(INSTAGRAM_URL, '_blank');
 
     } catch {
@@ -215,6 +252,40 @@ export default function RankingPage() {
            Os alunos mais brabos da Tecnologge ⚡
         </p>
       </div>
+
+      {/* Período do Ranking */}
+      <div className="max-w-3xl mx-auto mb-6">
+        <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-900/70 border border-white/5">
+          {[
+            { id: 'week', label: 'Esta semana' },
+            { id: 'four_weeks', label: '4 semanas' },
+            { id: 'general', label: 'Geral' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setRankingMode(tab.id as typeof rankingMode)}
+              className={`rounded-xl px-3 py-3 text-[9px] md:text-[10px] font-black uppercase tracking-wider transition-colors ${
+                rankingMode === tab.id
+                  ? 'bg-brand-primary text-white'
+                  : 'text-slate-500 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {myPosition && (
+        <div className="max-w-3xl mx-auto mb-6 rounded-2xl border border-brand-primary/20 bg-brand-primary/10 px-5 py-4 text-center">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Sua posição</p>
+          <p className="text-2xl font-black italic text-white mt-1">#{myPosition}</p>
+          <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500 mt-1">
+            {rankingMode === 'week' ? 'XP conquistado nesta semana' : rankingMode === 'four_weeks' ? 'XP conquistado nas últimas 4 semanas' : 'XP total'}
+          </p>
+        </div>
+      )}
 
       {/* Lista do Ranking */}
       <div className="max-w-3xl mx-auto space-y-3">
@@ -315,7 +386,11 @@ export default function RankingPage() {
           <TrendingUp className="text-white" size={24} />
         </div>
         <p className="text-slate-400 text-xs font-medium leading-relaxed">
-          O ranking é atualizado conforme você estuda. Cada aula concluída te coloca mais perto do topo da sua escola!
+          {rankingMode === 'general'
+            ? 'Este é o seu histórico de XP desde o início da jornada.'
+            : rankingMode === 'week'
+              ? 'Aqui entram os pontos conquistados desde segunda-feira. O ranking reinicia a cada semana.'
+              : 'Este é o ranking principal: considera o XP conquistado nas últimas 4 semanas.'}
         </p>
       </div>
     </div>
