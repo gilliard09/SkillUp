@@ -76,7 +76,7 @@ export default function RankingPage() {
   // ----------------------------------------------------------
   // FETCH RANKING (Agora recebe o ID da organização)
   // ----------------------------------------------------------
-  const fetchRanking = useCallback(async (orgId: string | null, mode: 'week' | 'four_weeks' | 'general') => {
+  const fetchRanking = useCallback(async (orgId: string | null, mode: 'week' | 'four_weeks' | 'general', currentId?: string, currentXp?: number) => {
     if (!orgId) return;
 
     if (mode === 'general') {
@@ -94,7 +94,7 @@ export default function RankingPage() {
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('organization_id', orgId)
-          .gt('xp', currentUser.xp ?? 0);
+          .gt('xp', currentXp ?? 0);
         setMyPosition((count ?? 0) + 1);
       }
       return;
@@ -115,7 +115,7 @@ export default function RankingPage() {
       const mine = rows.find(row => row.user_id === currentUser?.id);
       setMyPosition(mine ? Number(mine.position) : null);
     }
-  }, [currentUser?.id, currentUser?.xp]);
+  }, []);
 
   // ----------------------------------------------------------
   // INIT
@@ -145,7 +145,7 @@ export default function RankingPage() {
           if (profile.last_share_date === today) setAlreadySharedToday(true);
 
           // 2. Busca o ranking da escola específica deste aluno
-          await fetchRanking(profile.organization_id, rankingMode);
+          await fetchRanking(profile.organization_id, rankingMode, profile.id, profile.xp ?? 0);
         }
       } finally {
         setLoading(false);
@@ -190,14 +190,16 @@ export default function RankingPage() {
       setCurrentUser({ ...currentUser, xp: novoXp });
       notify('success', `Incrível! +${SHARE_XP_BONUS} XP adicionados. Volte amanhã!`);
 
-      if (currentUser.organization_id) {
-        await supabase.from('learning_activity').insert({
-          user_id: currentUser.id,
-          activity_type: 'project',
-          xp_earned: SHARE_XP_BONUS,
-        });
+      const { data: bonusData, error: bonusError } = await supabase.rpc('record_share_bonus', {
+        p_bonus: SHARE_XP_BONUS,
+      });
+      if (bonusError) throw bonusError;
+      if (bonusData?.already_today) {
+        setAlreadySharedToday(true);
+        notify('error', 'Você já coletou o bônus hoje.');
+        return;
       }
-      await fetchRanking(currentUser.organization_id, rankingMode);
+      await fetchRanking(currentUser.organization_id, rankingMode, currentUser.id, novoXp);
       window.open(INSTAGRAM_URL, '_blank');
 
     } catch {
