@@ -233,6 +233,7 @@ export default function AdminPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [studentsData, setStudentsData] = useState<StudentData[]>([]);
+  const [studentSearch, setStudentSearch] = useState('');
   const [totalStudents, setTotalStudents] = useState(0);
   const [selectedStudent, setSelectedStudent] = useState<StudentData | null>(null);
   const [studentProgress, setStudentProgress] = useState<ProgressCourse[]>([]);
@@ -403,6 +404,16 @@ export default function AdminPage() {
       setLoading(false);
     }
   }, [adminOrgId]);
+
+  const filteredStudents = studentsData.filter((student) => {
+    const search = studentSearch.trim().toLocaleLowerCase('pt-BR');
+    if (!search) return true;
+
+    return (
+      student.full_name.toLocaleLowerCase('pt-BR').includes(search) ||
+      student.email.toLocaleLowerCase('pt-BR').includes(search)
+    );
+  });
 
   // ----------------------------------------------------------
   // PROGRESSO DO ALUNO — aulas confirmadas pelo professor
@@ -1239,7 +1250,7 @@ export default function AdminPage() {
 
           {/* Tabela de alunos */}
           <div className="bg-slate-900/50 border border-white/5 p-8 rounded-[2.5rem]">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
               <h2 className="text-2xl font-black text-white uppercase italic flex items-center gap-3">
                 <GraduationCap className="text-brand-primary" size={32} />
                 Lista de Alunos
@@ -1253,6 +1264,33 @@ export default function AdminPage() {
                 {loading ? <Loader2 className="animate-spin mr-2" size={14} /> : null}
                 Atualizar
               </Button>
+            </div>
+
+            <div className="mb-6">
+              <label htmlFor="student-search" className="sr-only">Pesquisar aluno</label>
+              <div className="relative">
+                <input
+                  id="student-search"
+                  type="search"
+                  value={studentSearch}
+                  onChange={(e) => setStudentSearch(e.target.value)}
+                  placeholder="Pesquisar aluno por nome ou e-mail..."
+                  className="w-full bg-slate-950 border border-white/10 rounded-2xl py-4 pl-5 pr-12 text-white placeholder:text-slate-600 focus:outline-none focus:border-brand-primary/50 transition-colors"
+                />
+                {studentSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setStudentSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-slate-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors"
+                    aria-label="Limpar pesquisa"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
+              </div>
+              <p className="text-slate-600 text-[10px] font-black uppercase tracking-widest mt-2">
+                {filteredStudents.length} {filteredStudents.length === 1 ? 'aluno encontrado' : 'alunos encontrados'} de {totalStudents}
+              </p>
             </div>
 
             {loading ? (
@@ -1284,7 +1322,7 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {studentsData.map((student) => (
+                    {filteredStudents.map((student) => (
                       <tr
                         key={student.id}
                         onClick={() => loadStudentProgress(student)}
