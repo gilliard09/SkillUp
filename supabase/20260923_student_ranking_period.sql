@@ -41,7 +41,10 @@ begin
     from public.profiles p
     left join public.learning_activity la
       on la.user_id = p.id
-     and la.created_at >= now() - make_interval(days => v_days)
+     and la.created_at >= case
+       when v_days = 7 then date_trunc('week', now())
+       else now() - make_interval(days => v_days)
+     end
     where p.organization_id = v_org
       and exists (
         select 1
@@ -77,3 +80,45 @@ end;
 $$;
 
 grant execute on function public.get_student_ranking(integer) to authenticated;
+
+
+-- Registra bônus diário de compartilhamento com histórico de XP.
+create or replace function public.record_share_bonus(p_bonus integer default 20)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_today date := (now() at time zone 'America/Sao_Paulo')::date;
+  v_last date;
+  v_xp integer;
+begin
+  if v_user is null then raise exception 'Não autenticado'; end if;
+
+  select last_share_date, xp
+    into v_last, v_xp
+  from public.profiles
+  where id = v_user
+  for update;
+
+  if v_last = v_today then
+    return jsonb_build_object('already_today', true, 'xp', coalesce(v_xp, 0));
+  end if;
+
+  v_xp := coalesce(v_xp, 0) + greatest(coalesce(p_bonus, 0), 0);
+
+  update public.profiles
+     set xp = v_xp,
+         last_share_date = v_today
+   where id = v_user;
+
+  insert into public.learning_activity(user_id, activity_type, xp_earned)
+  values (v_user, 'project', greatest(coalesce(p_bonus, 0), 0));
+
+  return jsonb_build_object('already_today', false, 'xp', v_xp);
+end;
+$$;
+
+grant execute on function public.record_share_bonus(integer) to authenticated;
