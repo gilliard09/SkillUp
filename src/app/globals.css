@@ -227,3 +227,70 @@
   .tec-photo-grid div { min-height:140px; }
   .tec-footer .tec-container { flex-direction:column; }
 }
+
+
+/* Ajustes adicionais da landing Tecnologge */
+.tec-logo-placeholder {
+  width:42px;
+  height:42px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(255,255,255,.24);
+  border-radius:12px;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.05em;
+  color:rgba(255,255,255,.7);
+}
+.tec-social-proof { background:#f7f5f7; }
+.tec-stats {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:18px;
+  margin-top:48px;
+}
+.tec-stats > div {
+  background:white;
+  border-radius:22px;
+  padding:30px 20px;
+  box-shadow:0 12px 35px rgba(29,17,40,.06);
+}
+.tec-stats strong { display:block; color:var(--tec-purple); font-size:clamp(32px,4vw,48px); line-height:1; letter-spacing:-.04em; }
+.tec-stats span { display:block; margin-top:10px; color:var(--tec-muted); font-size:14px; }
+
+.tec-testimonials { background:#f7f5f7; }
+.tec-testimonial-placeholder {
+  max-width:760px;
+  margin:0 auto;
+  padding:38px;
+  border:1px solid #e6e0e8;
+  border-radius:22px;
+  background:white;
+  display:grid;
+  gap:10px;
+  text-align:center;
+}
+.tec-stars { display:flex; justify-content:center; gap:3px; color:var(--tec-orange); }
+.tec-testimonial-placeholder strong { font-size:20px; color:var(--tec-black); }
+.tec-testimonial-placeholder span { color:var(--tec-muted); font-size:14px; }
+
+.tec-location-grid {
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:18px;
+}
+.tec-location-card {
+  padding:30px;
+  border-radius:22px;
+  background:white;
+  box-shadow:0 16px 45px rgba(29,17,40,.08);
+  display:grid;
+  gap:10px;
+}
+.tec-location-card svg { color:var(--tec-orange); }
+.tec-location-card strong { font-size:22px; color:var(--tec-black); }
+.tec-location-card span { color:var(--tec-muted); line-height:1.6; }
+
+@media (max-width:760px) {
+  .tec-stats, .tec-location-grid { grid-template-columns:1fr; }
+}
