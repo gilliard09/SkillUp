@@ -255,9 +255,18 @@ export default function LandingPage() {
             </div>
             <div className="tec-media-grid">
               <div className="tec-photo-grid">
-                <div>Foto de aluno</div>
-                <div>Foto da escola</div>
-                <div>Foto de atividade</div>
+                <div className="tec-photo-card tec-photo-main">
+                  <img src="/tecnologge/alunos/aluno-01.jpg" alt="Aluno da Tecnologge durante uma atividade" />
+                </div>
+                <div className="tec-photo-card">
+                  <img src="/tecnologge/escola/sala-01.jpg" alt="Sala de aula da Tecnologge" />
+                </div>
+                <div className="tec-photo-card">
+                  <img src="/tecnologge/escola/sala-02.jpg" alt="Ambiente de aprendizagem da Tecnologge" />
+                </div>
+                <div className="tec-photo-card">
+                  <img src="/tecnologge/escola/fachada-01.jpg" alt="Fachada da Tecnologge" />
+                </div>
               </div>
               <div className="tec-video-grid">
                 <a className="tec-reel-card" href="https://www.instagram.com/reel/DLICV4KsBFm/?stkn=MXZ2anphbDY5N2Zhag==" target="_blank" rel="noreferrer">
