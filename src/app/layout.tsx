@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-// @ts-ignore
 import "./globals.css";
 
 const geistSans = Geist({
@@ -13,24 +12,18 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// ============================================================
-// METADATA + PWA
-// ============================================================
 export const metadata: Metadata = {
-  title: "SkillUp Academy",
-  description: "Plataforma de ensino da Tecnologge",
+  title: "Tecnologge | Formação para adolescentes",
+  description:
+    "Formação em tecnologia para adolescentes de 12 a 17 anos. Comece agora e prepare seu filho para o futuro.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "SkillUp",
+    title: "Tecnologge",
   },
 };
 
-// ============================================================
-// LAYOUT RAIZ — server component, sem usePathname
-// MobileNav fica no DashboardLayout, não aqui
-// ============================================================
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,11 +33,9 @@ export default function RootLayout({
     <html lang="pt-BR" className="dark">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <meta name="theme-color" content="#0F172A" />
+        <meta name="theme-color" content="#422657" />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-slate-950 text-slate-50`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>
