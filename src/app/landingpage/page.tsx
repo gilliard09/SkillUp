@@ -248,15 +248,39 @@ export default function LandingPage() {
           <div className="tec-proof">
             <div>
               <span className="tec-section-label">CONHEÇA A TECNOLOGGE</span>
-              <h2>Um ambiente para aprender fazendo.</h2>
+              <h2>Veja a Tecnologge por dentro.</h2>
               <p>
-                Aqui entram fotos reais dos alunos, da escola e das atividades. O objetivo é mostrar a experiência como ela realmente acontece.
+                Mais do que falar sobre a experiência, queremos mostrar como ela acontece. Conheça o ambiente, os alunos e um pouco da rotina da Tecnologge.
               </p>
             </div>
-            <div className="tec-photo-grid">
-              <div>Foto de aluno</div>
-              <div>Foto da escola</div>
-              <div>Foto de atividade</div>
+            <div className="tec-media-grid">
+              <div className="tec-photo-grid">
+                <div>Foto de aluno</div>
+                <div>Foto da escola</div>
+                <div>Foto de atividade</div>
+              </div>
+              <div className="tec-video-grid">
+                <a className="tec-reel-card" href="https://www.instagram.com/reel/DLICV4KsBFm/?stkn=MXZ2anphbDY5N2Zhag==" target="_blank" rel="noreferrer">
+                  <span className="tec-reel-play">▶</span>
+                  <strong>Veja a Tecnologge em ação</strong>
+                  <span>Assistir vídeo no Instagram</span>
+                </a>
+                <a className="tec-reel-card" href="https://www.instagram.com/reel/DY2jbcUpdE8/?stkn=MTFraDVvNXRrMmhtdQ==" target="_blank" rel="noreferrer">
+                  <span className="tec-reel-play">▶</span>
+                  <strong>Um pouco da nossa rotina</strong>
+                  <span>Assistir vídeo no Instagram</span>
+                </a>
+                <a className="tec-reel-card" href="https://www.instagram.com/reel/DZvGjfKRBpa/?stkn=MWhneG5xNmRjcnR4Zw==" target="_blank" rel="noreferrer">
+                  <span className="tec-reel-play">▶</span>
+                  <strong>Conheça mais da escola</strong>
+                  <span>Assistir vídeo no Instagram</span>
+                </a>
+                <a className="tec-reel-card" href="https://www.instagram.com/reel/DbtW2vnCWRP/?stkn=MW96cjUxOGdhbDI5eg==" target="_blank" rel="noreferrer">
+                  <span className="tec-reel-play">▶</span>
+                  <strong>Veja nossos alunos</strong>
+                  <span>Assistir vídeo no Instagram</span>
+                </a>
+              </div>
             </div>
           </div>
         </div>
