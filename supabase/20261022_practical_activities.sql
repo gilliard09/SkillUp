@@ -112,39 +112,76 @@ using (
 );
 
 drop policy if exists practical_progress_insert_own on public.practical_activity_progress;
-create policy practical_progress_insert_own on public.practical_activity_progress
-for insert to authenticated
-with check (
-  user_id = auth.uid()
-  and status in ('in_progress','pending')
-  and exists (
-    select 1 from public.practical_activities a
-    join public.profiles p on p.id = auth.uid()
-    join public.enrollments e on e.user_id = p.id and e.product_id = a.course_id
-    where a.id = practical_activity_progress.activity_id
-      and a.is_published = true
-      and a.organization_id = p.organization_id
-      and practical_activity_progress.current_step < jsonb_array_length(a.steps)
-  )
-);
-
 drop policy if exists practical_progress_update_own on public.practical_activity_progress;
-create policy practical_progress_update_own on public.practical_activity_progress
-for update to authenticated
-using (user_id = auth.uid() and status <> 'completed')
-with check (
-  user_id = auth.uid()
-  and status in ('in_progress','pending')
-  and exists (
-    select 1 from public.practical_activities a
-    join public.profiles p on p.id = auth.uid()
-    join public.enrollments e on e.user_id = p.id and e.product_id = a.course_id
-    where a.id = practical_activity_progress.activity_id
-      and a.is_published = true
-      and a.organization_id = p.organization_id
-      and practical_activity_progress.current_step < jsonb_array_length(a.steps)
-  )
-);
+
+grant select, insert, update, delete on public.practical_activities to authenticated;
+grant select on public.practical_activity_progress to authenticated;
+
+-- O progresso só avança por RPC autenticada, sem permitir que o cliente salte etapas via REST.
+create or replace function public.save_practical_activity_progress(
+  p_activity_id uuid,
+  p_current_step integer
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user uuid := auth.uid();
+  v_activity public.practical_activities%rowtype;
+  v_profile public.profiles%rowtype;
+  v_current integer;
+  v_status text;
+begin
+  if v_user is null then raise exception 'Faça login para salvar seu progresso.'; end if;
+  select * into v_activity from public.practical_activities
+    where id = p_activity_id and is_published = true;
+  if not found then raise exception 'Atividade não encontrada ou indisponível.'; end if;
+  select * into v_profile from public.profiles where id = v_user;
+  if not found or v_profile.role = 'admin' then raise exception 'Perfil de aluno inválido.'; end if;
+  if v_profile.organization_id is distinct from v_activity.organization_id then
+    raise exception 'Esta atividade não pertence à sua escola.';
+  end if;
+  if not exists (select 1 from public.enrollments e
+    where e.user_id = v_user and e.product_id = v_activity.course_id) then
+    raise exception 'Você não está matriculado neste curso.';
+  end if;
+  if p_current_step < 0 or p_current_step >= jsonb_array_length(v_activity.steps) then
+    raise exception 'Etapa inválida.';
+  end if;
+
+  select current_step, status into v_current, v_status
+    from public.practical_activity_progress
+    where activity_id = p_activity_id and user_id = v_user
+    for update;
+
+  if not found then
+    if p_current_step <> 0 then raise exception 'Comece pela primeira etapa.'; end if;
+    insert into public.practical_activity_progress(activity_id,user_id,current_step,status)
+      values(p_activity_id,v_user,0,'in_progress')
+      on conflict(activity_id,user_id) do nothing;
+    select current_step, status into v_current, v_status
+      from public.practical_activity_progress
+      where activity_id = p_activity_id and user_id = v_user
+      for update;
+  end if;
+
+  if v_status = 'completed' then
+    return jsonb_build_object('current_step',v_current,'completed',true);
+  end if;
+  if p_current_step > v_current + 1 then
+    raise exception 'Conclua as etapas em ordem.';
+  end if;
+
+  update public.practical_activity_progress
+    set current_step = p_current_step, status = 'in_progress', updated_at = now()
+    where activity_id = p_activity_id and user_id = v_user;
+  return jsonb_build_object('current_step',p_current_step,'completed',false);
+end;
+$$;
+
+revoke all on function public.save_practical_activity_progress(uuid,integer) from public;
+grant execute on function public.save_practical_activity_progress(uuid,integer) to authenticated;
 
 -- A atividade prática tem trilha própria; não altera nem conclui aulas antigas.
 -- Registra o tipo novo no histórico de aprendizagem sem apagar tipos existentes.
@@ -183,7 +220,7 @@ begin
   if not found then raise exception 'Atividade não encontrada ou indisponível.'; end if;
 
   select * into v_profile from public.profiles where id = v_user;
-  if not found or v_profile.role <> 'student' then
+  if not found or v_profile.role = 'admin' then
     raise exception 'Somente alunos podem concluir esta atividade.';
   end if;
   if v_profile.organization_id is distinct from v_activity.organization_id then
