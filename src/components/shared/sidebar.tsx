@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
+import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
 import { useRouter } from 'next/navigation';
@@ -18,6 +18,7 @@ type NavItem = {
 const BASE_ITEMS: NavItem[] = [
   { icon: LayoutDashboard, label: 'Início', href: '/dashboard' },
   { icon: Compass, label: 'Minha Jornada', href: '/dashboard/jornada' },
+  { icon: Activity, label: 'Atividade prática', href: '/dashboard/atividades-praticas' },
   { icon: Zap, label: 'Baú de Prompts', href: '/dashboard/sequencia', isSequencia: true },
   { icon: Sword, label: 'Desafios', href: '/dashboard/challenges' },
   { icon: FolderKanban, label: 'Meus Projetos', href: '/dashboard/projects' },
