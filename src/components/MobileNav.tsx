@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
-import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
+import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell, Activity } from 'lucide-react';
 
 type NavItem = {
   icon: React.ElementType;
@@ -17,6 +17,7 @@ type NavItem = {
 const BASE_ITEMS: NavItem[] = [
   { icon: LayoutGrid, label: 'Início', href: '/dashboard' },
   { icon: Compass, label: 'Jornada', href: '/dashboard/jornada' },
+  { icon: Activity, label: 'Atividade prática', href: '/dashboard/atividades-praticas' },
   { icon: Zap, label: 'Baú de Prompts', href: '/dashboard/sequencia', isSequencia: true },
   { icon: Sword, label: 'Desafios', href: '/dashboard/challenges' },
   { icon: Trophy, label: 'Ranking', href: '/dashboard/ranking' },
