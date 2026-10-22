@@ -342,6 +342,7 @@ export default function PracticalActivitiesPage() {
               <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
                 <button type="button" disabled={stepIndex===0||saving} onClick={async()=>{const next=stepIndex-1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
                 {stepIndex < selected.steps.length-1 ? <button type="button" disabled={saving} onClick={async()=>{const next=stepIndex+1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button> : <button type="button" disabled={saving} onClick={async()=>{if(await updateProgress(selected,stepIndex))setPinOpen(true)}} className={buttonClass+' bg-emerald-600 text-white hover:bg-emerald-500'}><ShieldCheck size={16}/> Concluir atividade</button>}
+              </div>
             )}
           </div>
         </section>
