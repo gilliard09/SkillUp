@@ -15,7 +15,7 @@ type LessonItem = { id: string; title: string; module_id: string };
 type Step = { title: string; content: string; code?: string };
 type ActivityItem = {
   id: string; organization_id: string; course_id: string; module_id: string | null;
-  lesson_id: string | null; title: string; description: string; instructions: string;
+  lesson_id: string | null; lesson_title: string | null; title: string; description: string; instructions: string;
   difficulty: 'Iniciante' | 'Intermediário' | 'Avançado'; xp_reward: number;
   steps: Step[]; is_published: boolean; created_at: string;
 };
@@ -60,7 +60,7 @@ export default function PracticalActivitiesPage() {
   const [adminTab, setAdminTab] = useState<'activities' | 'create'>('activities');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
-    title: '', course_id: '', module_id: '', lesson_id: '', description: '', instructions: '',
+    title: '', course_id: '', module_id: '', lesson_id: '', lesson_title: '', description: '', instructions: '',
     difficulty: 'Iniciante' as ActivityItem['difficulty'], xp_reward: '50',
     stepsText: 'Etapa 1: Preparação\nLeia as instruções e organize o que você vai precisar.\n\nEtapa 2: Execução\nRealize a atividade prática seguindo o conteúdo estudado.\n\nEtapa 3: Revisão e entrega\nRevise o resultado e chame o professor para validar.'
   });
@@ -170,7 +170,7 @@ export default function PracticalActivitiesPage() {
   const startCreate = () => {
     setEditingId(null);
     setForm({
-      title: '', course_id: courses[0]?.id || '', module_id: '', lesson_id: '', description: '', instructions: '',
+      title: '', course_id: courses[0]?.id || '', module_id: '', lesson_id: '', lesson_title: '', description: '', instructions: '',
       difficulty: 'Iniciante', xp_reward: '50',
       stepsText: 'Etapa 1: Preparação\nLeia as instruções e organize o que você vai precisar.\n\nEtapa 2: Execução\nRealize a atividade prática seguindo o conteúdo estudado.\n\nEtapa 3: Revisão e entrega\nRevise o resultado e chame o professor para validar.'
     });
@@ -180,7 +180,7 @@ export default function PracticalActivitiesPage() {
   const startEdit = (activity: ActivityItem) => {
     setEditingId(activity.id);
     setForm({
-      title: activity.title, course_id: activity.course_id, module_id: activity.module_id || '', lesson_id: activity.lesson_id || '', description: activity.description || '',
+      title: activity.title, course_id: activity.course_id, module_id: activity.module_id || '', lesson_id: activity.lesson_id || '', lesson_title: activity.lesson_title || '', description: activity.description || '',
       instructions: activity.instructions || '', difficulty: activity.difficulty,
       xp_reward: String(activity.xp_reward), stepsText: stepsToText(activity.steps || [])
     });
@@ -197,7 +197,7 @@ export default function PracticalActivitiesPage() {
     try {
       const payload = {
         organization_id: organizationId, course_id: form.course_id,
-        module_id: form.module_id || null, lesson_id: form.lesson_id || null,
+        module_id: form.module_id || null, lesson_id: form.lesson_title.trim() ? null : (form.lesson_id || null), lesson_title: form.lesson_title.trim() || null,
         title: form.title.trim(), description: form.description.trim(),
         instructions: form.instructions.trim(), difficulty: form.difficulty,
         xp_reward: Math.max(0, Math.min(1000, Number(form.xp_reward) || 0)),
@@ -282,9 +282,10 @@ export default function PracticalActivitiesPage() {
           <div><h2 className="text-xl font-black uppercase italic text-white">{editingId ? 'Editar atividade' : 'Nova atividade prática'}</h2><p className="mt-1 text-sm text-slate-400">Cada bloco separado por uma linha em branco será uma etapa.</p></div>
           <div className="grid gap-4 md:grid-cols-2">
             <label className="space-y-2 text-xs font-bold text-slate-400">Título da atividade<input required minLength={3} maxLength={160} className={inputClass} value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="Ex.: Crie sua primeira página web"/></label>
-            <label className="space-y-2 text-xs font-bold text-slate-400">Curso<select required className={inputClass} value={form.course_id} onChange={e=>setForm({...form,course_id:e.target.value,module_id:'',lesson_id:''})}><option value="">Selecione um curso</option>{courses.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
-            <label className="space-y-2 text-xs font-bold text-slate-400">Módulo (opcional)<select className={inputClass} value={form.module_id} onChange={e=>setForm({...form,module_id:e.target.value,lesson_id:''})}><option value="">Sem módulo específico</option>{modules.filter(m=>m.course_id===form.course_id).map(m=><option key={m.id} value={m.id}>{m.title}</option>)}</select></label>
-            <label className="space-y-2 text-xs font-bold text-slate-400">Aula (opcional)<select className={inputClass} value={form.lesson_id} onChange={e=>setForm({...form,lesson_id:e.target.value})}><option value="">Sem aula específica</option>{lessons.filter(l=>l.module_id===form.module_id).map(l=><option key={l.id} value={l.id}>{l.title}</option>)}</select></label>
+            <label className="space-y-2 text-xs font-bold text-slate-400">Curso<select required className={inputClass} value={form.course_id} onChange={e=>setForm({...form,course_id:e.target.value,module_id:'',lesson_id:'',lesson_title:''})}><option value="">Selecione um curso</option>{courses.map(c=><option key={c.id} value={c.id}>{c.title}</option>)}</select></label>
+            <label className="space-y-2 text-xs font-bold text-slate-400">Módulo (opcional)<select className={inputClass} value={form.module_id} onChange={e=>setForm({...form,module_id:e.target.value,lesson_id:'',lesson_title:''})}><option value="">Sem módulo específico</option>{modules.filter(m=>m.course_id===form.course_id).map(m=><option key={m.id} value={m.id}>{m.title}</option>)}</select></label>
+            <label className="space-y-2 text-xs font-bold text-slate-400">Aula existente (opcional)<select className={inputClass} value={form.lesson_id} onChange={e=>setForm({...form,lesson_id:e.target.value,lesson_title:''})}><option value="">Sem aula específica</option>{lessons.filter(l=>modules.some(m=>m.id===l.module_id && m.course_id===form.course_id) && (!form.module_id || l.module_id===form.module_id)).map(l=><option key={l.id} value={l.id}>{l.title}</option>)}</select><span className="block font-normal text-slate-600">Escolha uma aula cadastrada no curso e, se quiser, filtre pelo módulo.</span></label>
+            <label className="space-y-2 text-xs font-bold text-slate-400">Ou escreva o nome da aula (opcional)<input maxLength={160} className={inputClass} value={form.lesson_title} onChange={e=>setForm({...form,lesson_title:e.target.value,lesson_id:''})} placeholder="Ex.: Introdução ao HTML"/><span className="block font-normal text-slate-600">Se preencher este campo, o nome digitado será usado no lugar da aula existente.</span></label>
             <label className="space-y-2 text-xs font-bold text-slate-400">Nível<select className={inputClass} value={form.difficulty} onChange={e=>setForm({...form,difficulty:e.target.value as ActivityItem['difficulty']})}><option>Iniciante</option><option>Intermediário</option><option>Avançado</option></select></label>
             <label className="space-y-2 text-xs font-bold text-slate-400">Recompensa em XP<input type="number" min="0" max="1000" className={inputClass} value={form.xp_reward} onChange={e=>setForm({...form,xp_reward:e.target.value})}/></label>
           </div>
@@ -337,7 +338,7 @@ export default function PracticalActivitiesPage() {
                 return <article key={activity.id} className="flex flex-col rounded-3xl border border-white/10 bg-slate-900/60 p-5 transition hover:border-brand-primary/30">
                   <div className="flex items-start justify-between gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-primary/10 text-brand-primary"><Code2 size={22}/></div><div className="flex flex-wrap justify-end gap-2"><span className="rounded-full bg-white/5 px-3 py-1 text-[9px] font-black uppercase text-slate-400">{activity.difficulty}</span>{isAdmin&&<span className={'rounded-full px-3 py-1 text-[9px] font-black uppercase '+(activity.is_published?'bg-emerald-500/10 text-emerald-300':'bg-amber-500/10 text-amber-300')}>{activity.is_published?'Publicada':'Rascunho'}</span>}</div></div>
                   <h3 className="mt-4 text-lg font-black text-white">{activity.title}</h3><p className="mt-2 line-clamp-3 flex-1 text-sm leading-6 text-slate-400">{activity.description||activity.instructions||'Atividade prática guiada por etapas.'}</p>
-                  <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span className="inline-flex items-center gap-1"><GraduationCap size={13}/>{course?.title||'Curso'}</span>{activity.module_id&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{modules.find(m=>m.id===activity.module_id)?.title||'Módulo'}</span>}{activity.lesson_id&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{lessons.find(l=>l.id===activity.lesson_id)?.title||'Aula'}</span>}<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{activity.steps?.length||0} etapas</span><span className="inline-flex items-center gap-1 text-yellow-300"><Trophy size={13}/>{activity.xp_reward} XP</span></div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span className="inline-flex items-center gap-1"><GraduationCap size={13}/>{course?.title||'Curso'}</span>{activity.module_id&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{modules.find(m=>m.id===activity.module_id)?.title||'Módulo'}</span>}{(activity.lesson_title || activity.lesson_id)&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{activity.lesson_title || lessons.find(l=>l.id===activity.lesson_id)?.title || 'Aula'}</span>}<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{activity.steps?.length||0} etapas</span><span className="inline-flex items-center gap-1 text-yellow-300"><Trophy size={13}/>{activity.xp_reward} XP</span></div>
                   {!isAdmin&&p&&<div className="mt-4 flex items-center gap-2 text-xs">{p.status==='completed'?<span className="inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={14}/> Concluída</span>:<span className="inline-flex items-center gap-1 font-bold text-brand-primary"><Clock3 size={14}/> Em andamento · etapa {p.current_step+1}</span>}</div>}
                   <div className="mt-5 flex flex-wrap gap-2 border-t border-white/5 pt-4">
                     {isAdmin ? <><button onClick={()=>startEdit(activity)} className={buttonClass+' border border-white/10 text-slate-300'}>Editar</button><button onClick={()=>void togglePublish(activity)} className={buttonClass+' '+(activity.is_published?'border border-amber-500/20 text-amber-300':'bg-emerald-600 text-white')}>{activity.is_published?'Despublicar':'Publicar'}</button><button onClick={()=>void deleteActivity(activity)} className={buttonClass+' border border-red-500/20 text-red-300'}><Trash2 size={14}/></button></> : <button onClick={()=>openActivity(activity)} className={buttonClass+' w-full bg-brand-primary text-white'}>{p?.status==='completed'?'Rever atividade':'Continuar atividade'} <ChevronRight size={16}/></button>}
