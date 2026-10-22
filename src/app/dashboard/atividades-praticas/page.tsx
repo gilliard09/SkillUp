@@ -51,6 +51,7 @@ export default function PracticalActivitiesPage() {
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [progressRows, setProgressRows] = useState<Progress[]>([]);
   const [selected, setSelected] = useState<ActivityItem | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -159,6 +160,7 @@ export default function PracticalActivitiesPage() {
   };
 
   const openActivity = (activity: ActivityItem) => {
+    setPreviewMode(false);
     setError(''); setNotice(''); setPin(''); setPinOpen(false);
     setSelected(activity);
     const p = progressFor(activity.id);
@@ -167,7 +169,15 @@ export default function PracticalActivitiesPage() {
     if (p?.status !== 'completed') void updateProgress(activity, initialStep);
   };
 
+  const previewActivity = (activity: ActivityItem) => {
+    setError(''); setNotice(''); setPin(''); setPinOpen(false);
+    setStepIndex(0);
+    setSelected(activity);
+    setPreviewMode(true);
+  };
+
   const startCreate = () => {
+    setSelected(null); setPreviewMode(false);
     setEditingId(null);
     setForm({
       title: '', course_id: courses[0]?.id || '', module_id: '', lesson_id: '', lesson_title: '', description: '', instructions: '',
@@ -208,7 +218,7 @@ export default function PracticalActivitiesPage() {
         : await supabase.from('practical_activities').insert({ ...payload, created_by: userId, is_published: false });
       if (result.error) throw result.error;
       setNotice(editingId ? 'Atividade atualizada.' : 'Atividade criada como rascunho. Publique quando estiver pronta.');
-      setAdminTab('activities'); await load();
+      setAdminTab('activities'); setSelected(null); setPreviewMode(false); await load();
     } catch (e: any) {
       console.error(e);
       setError(e?.message || 'Não foi possível salvar a atividade.');
@@ -294,10 +304,11 @@ export default function PracticalActivitiesPage() {
           <label className="block space-y-2 text-xs font-bold text-slate-400">Etapas<textarea required rows={12} className={inputClass + ' font-mono leading-6'} value={form.stepsText} onChange={e=>setForm({...form,stepsText:e.target.value})} placeholder={'Etapa 1: Planejamento\nExplique o que fazer.\n\nEtapa 2: Execução\nDescreva a tarefa.'}/><span className="block font-normal text-slate-600">Formato: primeira linha de cada bloco é o título; linhas seguintes são as instruções. Separe cada etapa com uma linha em branco.</span></label>
           <div className="flex flex-wrap gap-3"><button type="submit" disabled={saving} className={buttonClass + ' bg-brand-primary text-white'}>{saving?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>} Salvar rascunho</button><button type="button" onClick={()=>{setEditingId(null);setAdminTab('activities')}} className={buttonClass+' border border-white/10 text-slate-300'}>Cancelar</button></div>
         </form>
-      ) : selected && !isAdmin ? (
+      ) : selected && (!isAdmin || previewMode) ? (
         <section className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60">
           <div className="border-b border-white/10 p-5 sm:p-7">
-            <button onClick={()=>{setSelected(null);setPinOpen(false);setError('')}} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={16}/> Todas as atividades</button>
+            <button onClick={()=>{setSelected(null);setPreviewMode(false);setPinOpen(false);setError('')}} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={16}/>{previewMode ? 'Voltar às atividades cadastradas' : 'Todas as atividades'}</button>
+            {previewMode && <div className="mb-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-200">Prévia do aluno: esta visualização não salva progresso nem concede XP.</div>}
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider"><span className="rounded-full bg-brand-primary/10 px-3 py-1 text-brand-primary">{selected.difficulty}</span><span className="rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-300"><Trophy size={12} className="mr-1 inline"/> {selected.xp_reward} XP</span><span className="rounded-full bg-white/5 px-3 py-1 text-slate-400">{stepIndex+1} de {selected.steps.length} etapas</span></div>
             <h2 className="mt-4 text-2xl font-black text-white sm:text-3xl">{selected.title}</h2>
             {selected.description && <p className="mt-2 text-sm text-slate-400">{selected.description}</p>}
@@ -311,7 +322,15 @@ export default function PracticalActivitiesPage() {
               <div className="prose prose-invert mt-5 max-w-none whitespace-pre-wrap text-sm leading-7 text-slate-300">{currentStep?.content}</div>
               {currentStep?.code && <pre className="mt-5 overflow-x-auto rounded-2xl bg-black/50 p-4 text-sm text-emerald-200"><code>{currentStep.code}</code></pre>}
             </div>
-            {progressFor(selected.id)?.status === 'completed' ? (
+            {previewMode ? (
+              <div className="mt-8 border-t border-white/10 pt-5">
+                <p className="mb-4 text-xs text-sky-200">Prévia somente para conferência. As etapas podem ser navegadas, mas nada será registrado.</p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <button type="button" disabled={stepIndex===0} onClick={()=>setStepIndex(i=>Math.max(0,i-1))} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
+                  {stepIndex < selected.steps.length-1 && <button type="button" onClick={()=>setStepIndex(i=>Math.min(selected.steps.length-1,i+1))} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button>}
+                </div>
+              </div>
+            ) : progressFor(selected.id)?.status === 'completed' ? (
               <div className="mt-8 flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-emerald-300"><CheckCircle2 size={22}/><div><p className="font-black">Atividade concluída</p><p className="text-xs text-emerald-200/70">Seu progresso foi registrado. O XP desta atividade não será duplicado.</p></div></div>
             ) : pinOpen ? (
               <div className="mt-8 space-y-4 rounded-2xl border border-brand-primary/20 bg-brand-primary/5 p-5">
@@ -323,7 +342,6 @@ export default function PracticalActivitiesPage() {
               <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
                 <button type="button" disabled={stepIndex===0||saving} onClick={async()=>{const next=stepIndex-1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
                 {stepIndex < selected.steps.length-1 ? <button type="button" disabled={saving} onClick={async()=>{const next=stepIndex+1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button> : <button type="button" disabled={saving} onClick={async()=>{if(await updateProgress(selected,stepIndex))setPinOpen(true)}} className={buttonClass+' bg-emerald-600 text-white hover:bg-emerald-500'}><ShieldCheck size={16}/> Concluir atividade</button>}
-              </div>
             )}
           </div>
         </section>
@@ -341,7 +359,7 @@ export default function PracticalActivitiesPage() {
                   <div className="mt-4 flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-500"><span className="inline-flex items-center gap-1"><GraduationCap size={13}/>{course?.title||'Curso'}</span>{activity.module_id&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{modules.find(m=>m.id===activity.module_id)?.title||'Módulo'}</span>}{(activity.lesson_title || activity.lesson_id)&&<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{activity.lesson_title || lessons.find(l=>l.id===activity.lesson_id)?.title || 'Aula'}</span>}<span className="inline-flex items-center gap-1"><BookOpen size={13}/>{activity.steps?.length||0} etapas</span><span className="inline-flex items-center gap-1 text-yellow-300"><Trophy size={13}/>{activity.xp_reward} XP</span></div>
                   {!isAdmin&&p&&<div className="mt-4 flex items-center gap-2 text-xs">{p.status==='completed'?<span className="inline-flex items-center gap-1 font-bold text-emerald-300"><CheckCircle2 size={14}/> Concluída</span>:<span className="inline-flex items-center gap-1 font-bold text-brand-primary"><Clock3 size={14}/> Em andamento · etapa {p.current_step+1}</span>}</div>}
                   <div className="mt-5 flex flex-wrap gap-2 border-t border-white/5 pt-4">
-                    {isAdmin ? <><button onClick={()=>startEdit(activity)} className={buttonClass+' border border-white/10 text-slate-300'}>Editar</button><button onClick={()=>void togglePublish(activity)} className={buttonClass+' '+(activity.is_published?'border border-amber-500/20 text-amber-300':'bg-emerald-600 text-white')}>{activity.is_published?'Despublicar':'Publicar'}</button><button onClick={()=>void deleteActivity(activity)} className={buttonClass+' border border-red-500/20 text-red-300'}><Trash2 size={14}/></button></> : <button onClick={()=>openActivity(activity)} className={buttonClass+' w-full bg-brand-primary text-white'}>{p?.status==='completed'?'Rever atividade':'Continuar atividade'} <ChevronRight size={16}/></button>}
+                    {isAdmin ? <><button onClick={()=>previewActivity(activity)} className={buttonClass+' border border-sky-500/20 text-sky-200'}><Eye size={14}/> Ver prévia</button><button onClick={()=>startEdit(activity)} className={buttonClass+' border border-white/10 text-slate-300'}>Editar</button><button onClick={()=>void togglePublish(activity)} className={buttonClass+' '+(activity.is_published?'border border-amber-500/20 text-amber-300':'bg-emerald-600 text-white')}>{activity.is_published?'Despublicar':'Publicar'}</button><button aria-label="Excluir atividade" title="Excluir atividade" onClick={()=>void deleteActivity(activity)} className={buttonClass+' border border-red-500/20 text-red-300'}><Trash2 size={14}/></button></> : <button onClick={()=>openActivity(activity)} className={buttonClass+' w-full bg-brand-primary text-white'}>{p?.status==='completed'?'Rever atividade':'Continuar atividade'} <ChevronRight size={16}/></button>}
                   </div>
                 </article>;
               })}
