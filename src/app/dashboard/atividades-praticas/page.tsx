@@ -116,8 +116,8 @@ export default function PracticalActivitiesPage() {
   const completedCount = visibleActivities.filter(a => progressFor(a.id)?.status === 'completed').length;
   const startedCount = visibleActivities.filter(a => progressFor(a.id) && progressFor(a.id)?.status !== 'completed').length;
 
-  const updateProgress = async (activity: ActivityItem, nextStep: number) => {
-    if (!userId || progressFor(activity.id)?.status === 'completed') return;
+  const updateProgress = async (activity: ActivityItem, nextStep: number): Promise<boolean> => {
+    if (!userId || progressFor(activity.id)?.status === 'completed') return true;
     const current = progressFor(activity.id);
     const payload = {
       activity_id: activity.id, user_id: userId,
@@ -126,18 +126,21 @@ export default function PracticalActivitiesPage() {
     };
     const { error: saveError } = await supabase.from('practical_activity_progress')
       .upsert(payload, { onConflict: 'activity_id,user_id' });
-    if (saveError) { setError('Não foi possível salvar seu progresso. Tente novamente.'); return; }
+    if (saveError) { setError('Não foi possível salvar seu progresso. Tente novamente.'); return false; }
     setProgressRows(rows => {
       const rest = rows.filter(p => p.activity_id !== activity.id);
       return [...rest, { ...payload, completed_at: current?.completed_at || null }];
     });
+    return true;
   };
 
   const openActivity = (activity: ActivityItem) => {
     setError(''); setNotice(''); setPin(''); setPinOpen(false);
     setSelected(activity);
     const p = progressFor(activity.id);
-    setStepIndex(Math.min(p?.current_step ?? 0, Math.max(0, activity.steps.length - 1)));
+    const initialStep = Math.min(p?.current_step ?? 0, Math.max(0, activity.steps.length - 1));
+    setStepIndex(initialStep);
+    if (p?.status !== 'completed') void updateProgress(activity, initialStep);
   };
 
   const startCreate = () => {
@@ -290,8 +293,8 @@ export default function PracticalActivitiesPage() {
               </div>
             ) : (
               <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-5">
-                <button type="button" disabled={stepIndex===0||saving} onClick={async()=>{const next=stepIndex-1;setStepIndex(next);await updateProgress(selected,next)}} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
-                {stepIndex < selected.steps.length-1 ? <button type="button" disabled={saving} onClick={async()=>{const next=stepIndex+1;await updateProgress(selected,next);if(!error)setStepIndex(next)}} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button> : <button type="button" disabled={saving} onClick={async()=>{await updateProgress(selected,stepIndex);setPinOpen(true)}} className={buttonClass+' bg-emerald-600 text-white hover:bg-emerald-500'}><ShieldCheck size={16}/> Concluir atividade</button>}
+                <button type="button" disabled={stepIndex===0||saving} onClick={async()=>{const next=stepIndex-1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
+                {stepIndex < selected.steps.length-1 ? <button type="button" disabled={saving} onClick={async()=>{const next=stepIndex+1;if(await updateProgress(selected,next))setStepIndex(next)}} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button> : <button type="button" disabled={saving} onClick={async()=>{if(await updateProgress(selected,stepIndex))setPinOpen(true)}} className={buttonClass+' bg-emerald-600 text-white hover:bg-emerald-500'}><ShieldCheck size={16}/> Concluir atividade</button>}
               </div>
             )}
           </div>
