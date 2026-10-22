@@ -138,17 +138,22 @@ export default function PracticalActivitiesPage() {
   const updateProgress = async (activity: ActivityItem, nextStep: number): Promise<boolean> => {
     if (!userId || progressFor(activity.id)?.status === 'completed') return true;
     const current = progressFor(activity.id);
+    const safeStep = Math.max(0, Math.min(nextStep, activity.steps.length - 1));
+    const { data, error: saveError } = await supabase.rpc('save_practical_activity_progress', {
+      p_activity_id: activity.id,
+      p_current_step: safeStep
+    });
+    if (saveError) { setError(saveError.message || 'Não foi possível salvar seu progresso. Tente novamente.'); return false; }
     const payload = {
       activity_id: activity.id, user_id: userId,
-      current_step: Math.max(0, Math.min(nextStep, activity.steps.length - 1)),
-      status: 'in_progress' as const, updated_at: new Date().toISOString()
+      current_step: Number(data?.current_step ?? safeStep),
+      status: (data?.completed ? 'completed' : 'in_progress') as Progress['status'],
+      updated_at: new Date().toISOString(),
+      completed_at: current?.completed_at || null
     };
-    const { error: saveError } = await supabase.from('practical_activity_progress')
-      .upsert(payload, { onConflict: 'activity_id,user_id' });
-    if (saveError) { setError('Não foi possível salvar seu progresso. Tente novamente.'); return false; }
     setProgressRows(rows => {
       const rest = rows.filter(p => p.activity_id !== activity.id);
-      return [...rest, { ...payload, completed_at: current?.completed_at || null }];
+      return [...rest, payload];
     });
     return true;
   };
