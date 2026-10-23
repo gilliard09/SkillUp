@@ -305,7 +305,7 @@ export default function PracticalActivitiesPage() {
           <div className="flex flex-wrap gap-3"><button type="submit" disabled={saving} className={buttonClass + ' bg-brand-primary text-white'}>{saving?<Loader2 size={16} className="animate-spin"/>:<Save size={16}/>} Salvar rascunho</button><button type="button" onClick={()=>{setEditingId(null);setAdminTab('activities')}} className={buttonClass+' border border-white/10 text-slate-300'}>Cancelar</button></div>
         </form>
       ) : selected && (!isAdmin || previewMode) ? (
-        <section className="overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60">
+        <section className="mx-auto w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60">
           <div className="border-b border-white/10 p-5 sm:p-7">
             <button onClick={()=>{setSelected(null);setPreviewMode(false);setPinOpen(false);setError('')}} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={16}/>{previewMode ? 'Voltar às atividades cadastradas' : 'Todas as atividades'}</button>
             {previewMode && <div className="mb-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-200">Prévia do aluno: esta visualização não salva progresso nem concede XP.</div>}
@@ -314,18 +314,18 @@ export default function PracticalActivitiesPage() {
             {selected.description && <p className="mt-2 text-sm text-slate-400">{selected.description}</p>}
             <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/5"><div className="h-full rounded-full bg-brand-primary transition-all" style={{width: `${((stepIndex+1)/selected.steps.length)*100}%`}}/></div>
           </div>
-          <div className="p-5 sm:p-8">
+          <div className="p-4 sm:p-8">
             {selected.instructions && <div className="mb-6 rounded-2xl border border-brand-primary/15 bg-brand-primary/5 p-4"><p className="mb-2 text-[10px] font-black uppercase tracking-widest text-brand-primary">Orientações gerais</p><p className="whitespace-pre-wrap text-sm leading-6 text-slate-300">{selected.instructions}</p></div>}
-            <div className="min-h-64">
+            <div className="min-h-0 sm:min-h-64">
               <p className="text-xs font-black uppercase tracking-widest text-brand-primary">Etapa {stepIndex+1}</p>
               <h3 className="mt-2 text-xl font-black text-white">{currentStep?.title}</h3>
-              <div className="prose prose-invert mt-5 max-w-none whitespace-pre-wrap text-sm leading-7 text-slate-300">{currentStep?.content}</div>
+              {currentStep?.content?.trim() && currentStep.content.trim() !== currentStep?.title?.trim() && <div className="prose prose-invert mt-5 max-w-none whitespace-pre-wrap break-words text-sm leading-7 text-slate-300">{currentStep.content}</div>}
               {currentStep?.code && <pre className="mt-5 overflow-x-auto rounded-2xl bg-black/50 p-4 text-sm text-emerald-200"><code>{currentStep.code}</code></pre>}
             </div>
             {previewMode ? (
-              <div className="mt-8 border-t border-white/10 pt-5">
+              <div className="mt-6 border-t border-white/10 pt-5">
                 <p className="mb-4 text-xs text-sky-200">Prévia somente para conferência. As etapas podem ser navegadas, mas nada será registrado.</p>
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <button type="button" disabled={stepIndex===0} onClick={()=>setStepIndex(i=>Math.max(0,i-1))} className={buttonClass+' border border-white/10 text-slate-300 hover:bg-white/5'}><ArrowLeft size={16}/> Voltar</button>
                   {stepIndex < selected.steps.length-1 && <button type="button" onClick={()=>setStepIndex(i=>Math.min(selected.steps.length-1,i+1))} className={buttonClass+' bg-brand-primary text-white'}>Próxima etapa <ArrowRight size={16}/></button>}
                 </div>
