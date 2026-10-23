@@ -54,7 +54,7 @@ export function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-1.5 transition-all active:scale-90"
+              className="flex min-w-0 flex-1 flex-col items-center gap-1.5 transition-all active:scale-90"
             >
               <div className={`relative p-2 rounded-2xl transition-all duration-300 ${
                 isActive && isSeq
@@ -80,7 +80,7 @@ export function MobileNav() {
                 )}
               </div>
 
-              <span className={`text-[9px] font-black uppercase tracking-wider transition-colors duration-300 ${
+              <span className={`w-full px-0.5 text-center text-[8px] leading-tight font-black uppercase tracking-normal break-words transition-colors duration-300 ${
                 isActive && isSeq
                   ? 'text-[#7B4FBF]'
                   : isActive
