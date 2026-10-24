@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft, CheckCircle2, Loader2, FileText,
-  Trophy, ChevronRight, Download, Eye, PartyPopper, AlertCircle,
+  Trophy, ChevronRight, Download, Eye, PartyPopper, AlertCircle, Activity, Clock3,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -19,6 +19,15 @@ type Module = {
   id: string;
   title: string;
   course_id: string;
+};
+
+type PracticalActivity = {
+  id: string;
+  title: string;
+  description: string | null;
+  difficulty: string;
+  steps: Array<unknown>;
+  xp_reward: number;
 };
 
 type Lesson = {
@@ -74,6 +83,7 @@ export default function LessonDetailsPage() {
 
   const [lesson, setLesson]               = useState<Lesson | null>(null);
   const [hasQuiz, setHasQuiz]             = useState(false);
+  const [practicalActivities, setPracticalActivities] = useState<PracticalActivity[]>([]);
   const [loading, setLoading]             = useState(true);
   const [isCompleting, setIsCompleting]   = useState(false);
   const [isDone, setIsDone]               = useState(false);
@@ -131,6 +141,15 @@ export default function LessonDetailsPage() {
 
       setLesson(lessonData);
       if (progressRes.data) setIsDone(true);
+
+      const { data: practicalRows, error: practicalError } = await supabase
+        .from('practical_activities')
+        .select('id,title,description,difficulty,steps,xp_reward')
+        .eq('lesson_id', lessonId)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false });
+      if (practicalError) throw practicalError;
+      setPracticalActivities((practicalRows || []) as PracticalActivity[]);
 
       if (quizRes.data) {
         const { count } = await supabase
@@ -350,6 +369,7 @@ export default function LessonDetailsPage() {
               </div>
             </div>
 
+
             {lesson.activity_pdf_url && (
               <div className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem]">
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2 italic">
@@ -377,6 +397,36 @@ export default function LessonDetailsPage() {
                 </div>
               </div>
             )}
+
+            {practicalActivities.length > 0 && (
+              <div className="bg-slate-900/60 border border-brand-primary/20 p-6 rounded-[2rem]">
+                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2 italic">
+                  <Activity size={17} className="text-brand-primary" /> Atividade prática desta aula
+                </h3>
+                <p className="text-slate-400 text-xs leading-relaxed mb-4">Agora é hora de aplicar o que você aprendeu. Seu progresso será acompanhado nesta atividade.</p>
+                <div className="space-y-3">
+                  {practicalActivities.map((activity) => (
+                    <div key={activity.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-black text-white">{activity.title}</h4>
+                          {activity.description && <p className="mt-1 text-xs leading-5 text-slate-400">{activity.description}</p>}
+                          <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            <span className="inline-flex items-center gap-1"><Clock3 size={12}/>{activity.steps?.length || 0} etapas</span>
+                            <span>{activity.difficulty}</span>
+                            <span className="text-yellow-300"><Trophy size={12} className="mr-1 inline"/>{activity.xp_reward} XP</span>
+                          </div>
+                        </div>
+                      </div>
+                      <Link href={`/dashboard/atividades-praticas?activity=${activity.id}&returnTo=/dashboard/lessons/${lesson.id}`} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:brightness-110">
+                        <Activity size={15}/> Iniciar atividade <ChevronRight size={16}/>
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>

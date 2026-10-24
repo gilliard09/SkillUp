@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
+import { LayoutDashboard, Sword, Trophy, User, LogOut, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell, Activity } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
 import { useRouter } from 'next/navigation';
@@ -27,6 +27,12 @@ const BASE_ITEMS: NavItem[] = [
   { icon: User, label: 'Perfil', href: '/dashboard/profile' },
 ];
 
+const PRACTICAL_ADMIN_ITEM: NavItem = {
+  icon: Activity,
+  label: 'Atividades práticas',
+  href: '/dashboard/atividades-praticas',
+};
+
 const ADMIN_ITEM: NavItem = {
   icon: ShieldCheck,
   label: 'Admin',
@@ -45,7 +51,7 @@ export function Sidebar() {
   const isAdmin = profile?.role === 'admin';
   const streak = profile?.streak ?? 0;
 
-  const menuItems = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
+  const menuItems = isAdmin ? [...BASE_ITEMS, PRACTICAL_ADMIN_ITEM, ADMIN_ITEM] : BASE_ITEMS;
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

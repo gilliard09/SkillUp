@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useDashboardUser } from '@/components/shared/dashboard-user-provider';
-import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell } from 'lucide-react';
+import { LayoutGrid, Sword, Trophy, User, ShieldCheck, Zap, Compass, Award, FolderKanban, Bell, Activity } from 'lucide-react';
 
 type NavItem = {
   icon: React.ElementType;
@@ -22,6 +22,12 @@ const BASE_ITEMS: NavItem[] = [
   { icon: Trophy, label: 'Ranking', href: '/dashboard/ranking' },
   { icon: User, label: 'Perfil', href: '/dashboard/profile' },
 ];
+
+const PRACTICAL_ADMIN_ITEM: NavItem = {
+  icon: Activity,
+  label: 'Atividades práticas',
+  href: '/dashboard/atividades-praticas',
+};
 
 const ADMIN_ITEM: NavItem = {
   icon: ShieldCheck,
@@ -40,7 +46,7 @@ export function MobileNav() {
   const isAdmin = profile?.role === 'admin';
   const streak = profile?.streak ?? 0;
 
-  const menuItems = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
+  const menuItems = isAdmin ? [...BASE_ITEMS, PRACTICAL_ADMIN_ITEM, ADMIN_ITEM] : BASE_ITEMS;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] md:hidden">
@@ -53,7 +59,7 @@ export function MobileNav() {
             <Link
               key={item.href}
               href={item.href}
-              className="flex flex-col items-center gap-1.5 transition-all active:scale-90"
+              className="flex min-w-0 flex-1 flex-col items-center gap-1.5 transition-all active:scale-90"
             >
               <div className={`relative p-2 rounded-2xl transition-all duration-300 ${
                 isActive && isSeq
@@ -79,7 +85,7 @@ export function MobileNav() {
                 )}
               </div>
 
-              <span className={`text-[9px] font-black uppercase tracking-wider transition-colors duration-300 ${
+              <span className={`w-full px-0.5 text-center text-[8px] leading-tight font-black uppercase tracking-normal break-words transition-colors duration-300 ${
                 isActive && isSeq
                   ? 'text-[#7B4FBF]'
                   : isActive
