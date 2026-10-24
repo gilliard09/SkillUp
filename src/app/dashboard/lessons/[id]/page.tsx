@@ -418,7 +418,7 @@ export default function LessonDetailsPage() {
                           </div>
                         </div>
                       </div>
-                      <Link href={`/dashboard/atividades-praticas?activity=${activity.id}`} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:brightness-110">
+                      <Link href={`/dashboard/atividades-praticas?activity=${activity.id}&returnTo=/dashboard/lessons/${lesson.id}`} className="mt-4 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-primary px-4 py-3 text-xs font-black uppercase tracking-wide text-white transition hover:brightness-110">
                         <Activity size={15}/> Iniciar atividade <ChevronRight size={16}/>
                       </Link>
                     </div>
