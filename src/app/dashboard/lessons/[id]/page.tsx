@@ -370,6 +370,34 @@ export default function LessonDetailsPage() {
             </div>
 
 
+            {lesson.activity_pdf_url && (
+              <div className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem]">
+                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2 italic">
+                  <FileText size={16} className="text-brand-primary" /> Material Complementar
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <a
+                    href={lesson.activity_pdf_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="flex items-center justify-center gap-2 bg-white/5 text-white text-[9px] font-black py-4 rounded-xl border border-white/5 hover:bg-white/10 transition-all uppercase italic"
+                  >
+                    <Eye size={14} /> Ver
+                  </a>
+                  <button
+                    onClick={handleDownload}
+                    disabled={downloading}
+                    className="flex items-center justify-center gap-2 bg-brand-primary text-white text-[9px] font-black py-4 rounded-xl hover:opacity-90 transition-all uppercase italic shadow-lg shadow-brand-primary/20 disabled:opacity-60"
+                  >
+                    {downloading
+                      ? <Loader2 size={14} className="animate-spin" />
+                      : <><Download size={14} /> Baixar</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
+
             {practicalActivities.length > 0 && (
               <div className="bg-slate-900/60 border border-brand-primary/20 p-6 rounded-[2rem]">
                 <h3 className="text-white font-black text-xs uppercase tracking-widest mb-2 flex items-center gap-2 italic">
@@ -399,33 +427,6 @@ export default function LessonDetailsPage() {
               </div>
             )}
 
-            {lesson.activity_pdf_url && (
-              <div className="bg-slate-900/40 border border-white/5 p-6 rounded-[2rem]">
-                <h3 className="text-white font-black text-xs uppercase tracking-widest mb-4 flex items-center gap-2 italic">
-                  <FileText size={16} className="text-brand-primary" /> Material Complementar
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <a
-                    href={lesson.activity_pdf_url}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="flex items-center justify-center gap-2 bg-white/5 text-white text-[9px] font-black py-4 rounded-xl border border-white/5 hover:bg-white/10 transition-all uppercase italic"
-                  >
-                    <Eye size={14} /> Ver
-                  </a>
-                  <button
-                    onClick={handleDownload}
-                    disabled={downloading}
-                    className="flex items-center justify-center gap-2 bg-brand-primary text-white text-[9px] font-black py-4 rounded-xl hover:opacity-90 transition-all uppercase italic shadow-lg shadow-brand-primary/20 disabled:opacity-60"
-                  >
-                    {downloading
-                      ? <Loader2 size={14} className="animate-spin" />
-                      : <><Download size={14} /> Baixar</>
-                    }
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
