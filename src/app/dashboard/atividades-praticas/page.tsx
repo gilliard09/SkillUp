@@ -132,13 +132,15 @@ export default function PracticalActivitiesPage() {
   // Abre diretamente a atividade vinculada à aula quando o aluno chega pelo botão "Iniciar atividade".
   useEffect(() => {
     if (loading || typeof window === 'undefined') return;
-    const requestedId = new URLSearchParams(window.location.search).get('activity');
+    const params = new URLSearchParams(window.location.search);
+    const requestedId = params.get('activity');
+    if (!isAdmin && !requestedId) { router.replace('/dashboard'); return; }
     if (!requestedId || openedQueryActivity.current === requestedId) return;
     const activity = activities.find(item => item.id === requestedId && item.is_published);
     if (!activity) return;
     openedQueryActivity.current = requestedId;
     openActivity(activity);
-  }, [loading, activities]);
+  }, [loading, activities, isAdmin, router]);
 
   const isAdmin = role === 'admin';
   const progressFor = (activityId: string) => progressRows.find(p => p.activity_id === activityId);
@@ -319,7 +321,7 @@ export default function PracticalActivitiesPage() {
       ) : selected && (!isAdmin || previewMode) ? (
         <section className="mx-auto w-full max-w-4xl overflow-hidden rounded-3xl border border-white/10 bg-slate-900/60">
           <div className="border-b border-white/10 p-5 sm:p-7">
-            <button onClick={()=>{setSelected(null);setPreviewMode(false);setPinOpen(false);setError('')}} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={16}/>{previewMode ? 'Voltar às atividades cadastradas' : 'Todas as atividades'}</button>
+            <button onClick={()=>{const returnTo=typeof window!=='undefined'?new URLSearchParams(window.location.search).get('returnTo'):null;if(!isAdmin&&returnTo){router.push(returnTo);return;}setSelected(null);setPreviewMode(false);setPinOpen(false);setError('')}} className="mb-5 inline-flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-white"><ArrowLeft size={16}/>{previewMode ? 'Voltar às atividades cadastradas' : (!isAdmin ? 'Voltar à aula' : 'Todas as atividades')}</button>
             {previewMode && <div className="mb-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-xs font-bold text-sky-200">Prévia do aluno: esta visualização não salva progresso nem concede XP.</div>}
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-wider"><span className="rounded-full bg-brand-primary/10 px-3 py-1 text-brand-primary">{selected.difficulty}</span><span className="rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-300"><Trophy size={12} className="mr-1 inline"/> {selected.xp_reward} XP</span><span className="rounded-full bg-white/5 px-3 py-1 text-slate-400">{stepIndex+1} de {selected.steps.length} etapas</span></div>
             <h2 className="mt-4 text-2xl font-black text-white sm:text-3xl">{selected.title}</h2>
