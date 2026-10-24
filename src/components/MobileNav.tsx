@@ -17,12 +17,17 @@ type NavItem = {
 const BASE_ITEMS: NavItem[] = [
   { icon: LayoutGrid, label: 'Início', href: '/dashboard' },
   { icon: Compass, label: 'Jornada', href: '/dashboard/jornada' },
-  { icon: Activity, label: 'Atividade prática', href: '/dashboard/atividades-praticas' },
   { icon: Zap, label: 'Baú de Prompts', href: '/dashboard/sequencia', isSequencia: true },
   { icon: Sword, label: 'Desafios', href: '/dashboard/challenges' },
   { icon: Trophy, label: 'Ranking', href: '/dashboard/ranking' },
   { icon: User, label: 'Perfil', href: '/dashboard/profile' },
 ];
+
+const PRACTICAL_ADMIN_ITEM: NavItem = {
+  icon: Activity,
+  label: 'Atividades práticas',
+  href: '/dashboard/atividades-praticas',
+};
 
 const ADMIN_ITEM: NavItem = {
   icon: ShieldCheck,
@@ -41,7 +46,7 @@ export function MobileNav() {
   const isAdmin = profile?.role === 'admin';
   const streak = profile?.streak ?? 0;
 
-  const menuItems = isAdmin ? [...BASE_ITEMS, ADMIN_ITEM] : BASE_ITEMS;
+  const menuItems = isAdmin ? [...BASE_ITEMS, PRACTICAL_ADMIN_ITEM, ADMIN_ITEM] : BASE_ITEMS;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-[100] md:hidden">
