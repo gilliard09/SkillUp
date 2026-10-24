@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Activity, ArrowLeft, ArrowRight, BookOpen, CheckCircle2, ChevronRight,
@@ -52,6 +52,7 @@ export default function PracticalActivitiesPage() {
   const [progressRows, setProgressRows] = useState<Progress[]>([]);
   const [selected, setSelected] = useState<ActivityItem | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const openedQueryActivity = useRef('');
   const [stepIndex, setStepIndex] = useState(0);
   const [pin, setPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -127,6 +128,17 @@ export default function PracticalActivitiesPage() {
   }, [router]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Abre diretamente a atividade vinculada à aula quando o aluno chega pelo botão "Iniciar atividade".
+  useEffect(() => {
+    if (loading || typeof window === 'undefined') return;
+    const requestedId = new URLSearchParams(window.location.search).get('activity');
+    if (!requestedId || openedQueryActivity.current === requestedId) return;
+    const activity = activities.find(item => item.id === requestedId && item.is_published);
+    if (!activity) return;
+    openedQueryActivity.current = requestedId;
+    openActivity(activity);
+  }, [loading, activities]);
 
   const isAdmin = role === 'admin';
   const progressFor = (activityId: string) => progressRows.find(p => p.activity_id === activityId);
