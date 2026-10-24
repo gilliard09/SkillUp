@@ -129,6 +129,8 @@ export default function PracticalActivitiesPage() {
 
   useEffect(() => { void load(); }, [load]);
 
+  const isAdmin = role === 'admin';
+
   // Abre diretamente a atividade vinculada à aula quando o aluno chega pelo botão "Iniciar atividade".
   useEffect(() => {
     if (loading || typeof window === 'undefined') return;
@@ -142,7 +144,6 @@ export default function PracticalActivitiesPage() {
     openActivity(activity);
   }, [loading, activities, isAdmin, router]);
 
-  const isAdmin = role === 'admin';
   const progressFor = (activityId: string) => progressRows.find(p => p.activity_id === activityId);
   const visibleActivities = useMemo(() => activities.filter(a =>
     isAdmin ? true : a.is_published && courses.some(c => c.id === a.course_id)
