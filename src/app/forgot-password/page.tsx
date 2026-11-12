@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
                 Enviamos um link de recuperação para <strong>{email}</strong>
               </p>
               <p className="text-sm text-purple-300">
-                Verifique sua caixa de entrada e spam. O link expira em 1 hora.
+                Verifique sua caixa de entrada e spam e abra o link assim que possível. Se não funcionar, solicite um novo e-mail de recuperação.
               </p>
               <Button 
                 onClick={() => setSuccess(false)}
