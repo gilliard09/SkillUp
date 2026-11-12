@@ -17,7 +17,6 @@ export default function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // Validações de senha
   const passwordChecks = {
     minLength: password.length >= 8,
     hasMatch: password === confirmPassword && password.length > 0,
@@ -26,42 +25,86 @@ export default function UpdatePasswordPage() {
   const isValidPassword = passwordChecks.minLength && passwordChecks.hasMatch;
 
   useEffect(() => {
-  const init = async () => {
-    // 1. Tenta recuperar a sessão atual imediatamente (leitura de token na URL)
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    if (session) {
-      setIsReady(true);
-      return;
-    }
+    let active = true;
+    let timeout: ReturnType<typeof setTimeout> | undefined;
 
-    // 2. Se não encontrou, configura o listener apenas para capturar o evento de recuperação
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' && session) {
-        setIsReady(true);
+    const markReady = () => {
+      if (!active) return;
+      if (timeout) clearTimeout(timeout);
+      setIsReady(true);
+      setError(null);
+    };
+
+    // O cliente @supabase/ssr usa PKCE e detecta o código de recuperação
+    // presente na URL. O listener também cobre a validação assíncrona.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        session &&
+        (event === 'PASSWORD_RECOVERY' ||
+          event === 'SIGNED_IN' ||
+          event === 'INITIAL_SESSION')
+      ) {
+        markReady();
       }
     });
 
-    // 3. Segurança: Se após 5 segundos nada aconteceu, assume que o link expirou
-    const timeout = setTimeout(() => {
-      if (!isReady) {
-        setError('O link de redefinição expirou ou não foi validado.');
-        setTimeout(() => router.push('/login'), 3000);
+    const validateSession = async () => {
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+
+      if (!active) return;
+
+      if (session) {
+        markReady();
+        return;
       }
-    }, 5000);
+
+      const query = new URLSearchParams(window.location.search);
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const linkError =
+        query.get('error_description') ||
+        hash.get('error_description') ||
+        query.get('error') ||
+        hash.get('error');
+
+      // Não declarar o link expirado por uma demora curta na inicialização.
+      // O cliente pode ainda estar trocando o código PKCE pela sessão.
+      timeout = setTimeout(async () => {
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+
+        if (!active) return;
+
+        if (currentSession) {
+          markReady();
+          return;
+        }
+
+        setError(
+          linkError ||
+            sessionError?.message ||
+            'Não foi possível validar o link. Solicite um novo e-mail de recuperação e abra o link no mesmo navegador em que iniciou o processo.'
+        );
+      }, 12000);
+    };
+
+    void validateSession();
 
     return () => {
+      active = false;
+      if (timeout) clearTimeout(timeout);
       subscription.unsubscribe();
-      clearTimeout(timeout);
     };
-  };
-
-  init();
-}, []);
+  }, []);
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!isValidPassword) {
       setError('Verifique os requisitos da senha');
       return;
@@ -72,22 +115,22 @@ export default function UpdatePasswordPage() {
 
     try {
       const { error } = await supabase.auth.updateUser({
-        password: password
+        password,
       });
 
       if (error) throw error;
 
-      // Sucesso - redireciona após mostrar mensagem
-      alert('✅ Senha atualizada com sucesso!');
+      alert('Senha atualizada com sucesso!');
       router.push('/login');
-    } catch (err: any) {
-      setError(err.message || 'Erro ao atualizar senha');
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : 'Erro ao atualizar senha'
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Tela de loading
   if (!isReady && !error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 flex items-center justify-center">
@@ -99,15 +142,20 @@ export default function UpdatePasswordPage() {
     );
   }
 
-  // Tela de erro
   if (error && !isReady) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 flex items-center justify-center p-4">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 max-w-md text-center">
           <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-white text-xl mb-2">Link Inválido</h2>
-          <p className="text-purple-200 mb-4">{error}</p>
-          <p className="text-sm text-purple-300">Redirecionando para login...</p>
+          <h2 className="text-white text-xl mb-2">Não foi possível validar o link</h2>
+          <p className="text-purple-200 mb-6">{error}</p>
+          <Button
+            type="button"
+            onClick={() => router.push('/forgot-password')}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            Solicitar novo link
+          </Button>
         </div>
       </div>
     );
@@ -117,7 +165,6 @@ export default function UpdatePasswordPage() {
     <div className="min-h-screen bg-gradient-to-br from-purple-950 via-purple-900 to-purple-950 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-8 shadow-2xl border border-white/20">
-          {/* Header */}
           <div className="text-center mb-6">
             <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-purple-300" />
@@ -131,14 +178,13 @@ export default function UpdatePasswordPage() {
           </div>
 
           <form onSubmit={handleUpdate} className="space-y-4">
-            {/* Campo Nova Senha */}
             <div>
               <label className="text-white text-sm mb-2 block">Nova senha</label>
               <div className="relative">
-                <Input 
-                  type={showPassword ? "text" : "password"}
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
+                <Input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   placeholder="Mínimo 8 caracteres"
                   className="bg-white/10 border-white/20 text-white placeholder:text-purple-300 pr-10"
                   required
@@ -153,14 +199,13 @@ export default function UpdatePasswordPage() {
               </div>
             </div>
 
-            {/* Campo Confirmar Senha */}
             <div>
               <label className="text-white text-sm mb-2 block">Confirmar senha</label>
               <div className="relative">
-                <Input 
-                  type={showConfirm ? "text" : "password"}
-                  value={confirmPassword} 
-                  onChange={(e) => setConfirmPassword(e.target.value)} 
+                <Input
+                  type={showConfirm ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="Digite a senha novamente"
                   className="bg-white/10 border-white/20 text-white placeholder:text-purple-300 pr-10"
                   required
@@ -175,7 +220,6 @@ export default function UpdatePasswordPage() {
               </div>
             </div>
 
-            {/* Checklist de requisitos */}
             <div className="space-y-2 bg-white/5 rounded-lg p-4">
               <p className="text-xs text-purple-300 mb-2">Requisitos da senha:</p>
               <div className="space-y-1">
@@ -190,16 +234,14 @@ export default function UpdatePasswordPage() {
               </div>
             </div>
 
-            {/* Mensagem de erro */}
             {error && (
               <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-3">
                 <p className="text-red-200 text-sm">{error}</p>
               </div>
             )}
 
-            {/* Botão submit */}
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={loading || !isValidPassword}
               className="w-full bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
